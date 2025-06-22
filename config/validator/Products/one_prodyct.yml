@@ -1,0 +1,5 @@
+App\DTO\Productos\OneProductDTO:
+    properties:
+        code:
+            - NotBlank: 
+                message: 'El campo codigo no puede quedar vacío.'

@@ -1,0 +1,35 @@
+security:
+    enable_authenticator_manager: true
+    # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
+    password_hashers:
+        App\Model\Usuario:
+            id: 'App\Security\CustomPasswordHasher'
+    # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
+    providers:
+        usuarios:
+            id: App\Security\UsuariosProvider
+    firewalls:
+        dev:
+            pattern: ^/(_(profiler|wdt)|css|images|js)/
+            security: false
+        login:
+            pattern: ^/api/usuario/login
+            stateless: true
+            json_login:
+                check_path: /api/usuario/login 
+                success_handler: lexik_jwt_authentication.handler.authentication_success
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+        api:
+            pattern:   ^/api
+            provider: usuarios
+            stateless: true
+            guard:
+                authenticators:
+                    - lexik_jwt_authentication.jwt_token_authenticator
+    # Easy way to control access for large sections of your site
+    # Note: Only the *first* access control that matches will be used
+    access_control:
+        - { path: ^/api/usuario/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
+        - { path: ^/api/usuario/registrar_usuario, roles: IS_AUTHENTICATED_ANONYMOUSLY }
+        - { path: ^/api/products/precio_producto_sin_token, roles: IS_AUTHENTICATED_ANONYMOUSLY }
+        - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

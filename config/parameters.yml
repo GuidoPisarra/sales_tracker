@@ -1,0 +1,2 @@
+parameters:
+    my_cert_path: /path/to/my/cert.pem

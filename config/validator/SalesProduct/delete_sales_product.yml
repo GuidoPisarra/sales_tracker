@@ -1,0 +1,5 @@
+App\DTO\SalesProduct\DeleteSalesProductDTO:
+    properties:
+        idSaleProduct:
+            - NotBlank: 
+                message: 'El campo id venta no puede quedar vacío.'

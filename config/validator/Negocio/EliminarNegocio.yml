@@ -1,0 +1,8 @@
+App\DTO\Negocio\EliminarNegocioDTO:
+    properties:
+        id_negocio:
+            - NotBlank: 
+                message: 'El campo id_negocio no puede quedar vacío.'
+        sucursal:
+            - NotBlank: 
+                message: 'El campo sucursal no puede quedar vacío.'

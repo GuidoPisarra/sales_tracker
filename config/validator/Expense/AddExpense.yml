@@ -1,0 +1,11 @@
+App\DTO\Expenses\AddExpenseDTO:
+    properties:
+        description:
+            - NotBlank: 
+                message: 'El campo descripción no puede quedar vacío.'
+        price:
+            - NotBlank: 
+                message: 'El campo precio no puede quedar vacío.'
+        id_negocio:
+            - NotBlank: 
+                message: 'El campo id negocio no puede quedar vacío.'    

@@ -1,0 +1,23 @@
+App\DTO\Productos\AddStockDTO:
+    properties:
+        id:
+            - NotBlank: 
+                message: 'El campo id no puede quedar vacío.'
+        description:
+            - NotBlank: 
+                message: 'El campo descripción no puede quedar vacío.'
+        costPrice:
+            - NotBlank: 
+                message: 'El campo precio costo no puede quedar vacío.'
+        salePrice:
+            - NotBlank: 
+                message: 'El campo precio venta no puede quedar vacío.'
+        quantity:
+            - NotBlank: 
+                message: 'El campo cantidad no puede quedar vacío.'
+        code:
+            - NotBlank: 
+                message: 'El campo codigo no puede quedar vacío.'
+        size:
+            - NotBlank: 
+                message: 'El campo talle no puede quedar vacío.'

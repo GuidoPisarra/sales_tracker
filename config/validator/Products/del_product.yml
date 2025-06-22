@@ -1,0 +1,5 @@
+App\DTO\Productos\DeleteProductDTO:
+    properties:
+        id:
+            - NotBlank: 
+                message: 'El campo id no puede quedar vacío.'

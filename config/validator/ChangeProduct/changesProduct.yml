@@ -1,0 +1,18 @@
+App\DTO\ChangeProduct\ChangeProductDTO:
+    properties:
+        id_producto_cambio:
+          - NotBlank: 
+                message: 'El campo descripción no puede quedar vacío.'          
+        precio_producto_cambio:
+          - NotBlank: 
+                message: 'El campo descripción no puede quedar vacío.'
+        id_producto_nuevo:
+          - NotBlank: 
+                message: 'El campo descripción no puede quedar vacío.'
+        precio_producto_nuevo:
+          - NotBlank: 
+                message: 'El campo descripción no puede quedar vacío.'
+        id_negocio:
+          - NotBlank: 
+                message: 'El campo descripción no puede quedar vacío.'
+       

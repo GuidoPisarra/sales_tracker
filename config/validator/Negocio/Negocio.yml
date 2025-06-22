@@ -1,0 +1,14 @@
+App\DTO\Negocio\NegocioDTO:
+    properties:
+        id_negocio:
+            - NotBlank: 
+                message: 'El campo id_negocio no puede quedar vacío.'
+        sucursal:
+            - NotBlank: 
+                message: 'El campo sucursal no puede quedar vacío.'
+        nombre:
+            - NotBlank: 
+                message: 'El campo nombre no puede quedar vacío.'
+        domicilio:
+            - NotBlank: 
+                message: 'El campo domicilio no puede quedar vacío.'

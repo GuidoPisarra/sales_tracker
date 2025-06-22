@@ -1,0 +1,20 @@
+App\DTO\SalesProduct\AddSalesProductDTO:
+    properties:
+        idProduct:
+            - NotBlank: 
+                message: 'El campo id producto no puede quedar vacío.'
+        saleDay:
+            - NotBlank: 
+                message: 'El campo dia de venta  no puede quedar vacío.'
+        quantity:
+            - NotBlank: 
+                message: 'El campo cantidad no puede quedar vacío.'
+        price:
+            - NotBlank: 
+                message: 'El campo precio venta no puede quedar vacío.'
+        typePayment:
+            - NotBlank: 
+                message: 'El campo tipo de pago no puede quedar vacío.'
+        id_negocio:
+            - NotBlank: 
+                message: 'El campo id_negocio no puede quedar vacío.'

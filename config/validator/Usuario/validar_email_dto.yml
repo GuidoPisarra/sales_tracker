@@ -1,0 +1,7 @@
+App\DTO\Usuario\ValidarEmailDTO:
+    properties:
+        email:
+            - NotBlank: 
+                message: 'El campo email no puede quedar vacío.'
+            - Email: 
+                message: 'El campo email no tiene un formato correcto.'  
