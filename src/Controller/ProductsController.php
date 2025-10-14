@@ -34,11 +34,8 @@ class ProductsController extends BaseController
             $list_products = $products_service->list_products($id_local);
             return $this->respuesta(200, $list_products, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
-        return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
     /**
