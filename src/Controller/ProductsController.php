@@ -18,15 +18,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/products")
- */
+
+#[Route('/api/products')]
 class ProductsController extends BaseController
 {
 
-    /**
-     * @Route("/products_list/{id_local}", name="app_products_list", methods={"GET"})
-     */
+    #[Route('/products_list/{id_local}', name: 'app_products_list', methods: ['GET'])]
     public function list_products(Request $request, ValidatorInterface $validator, ProductsService $products_service, int $id_local): JsonResponse
     {
         try {
@@ -41,9 +38,8 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/products", name="app_products_add", methods={"POST"})
-     */
+
+    #[Route('/products', name: 'app_products_add', methods: ['POST'])]
     public function add_product(Request $request, ValidatorInterface $validator, ProductsService $products_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -77,9 +73,7 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/products/delete", name="app_products_del", methods={"POST"})
-     */
+    #[Route('/products/delete', name: 'app_products_del', methods: ['POST'])]
     public function delete_product(Request $request, ValidatorInterface $validator, ProductsService $products_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -112,9 +106,7 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/products_one/{code}/{id_negocio}", name="app_products_get_one", methods={"GET"})
-     */
+    #[Route('/products_one/{code}/{id_negocio}', name: 'app_products_get_one', methods: ['GET'])]
     public function one_product(ValidatorInterface $validator, ProductsService $products_service, string $code, int $id_negocio): JsonResponse
     {
         $dto = new OneProductDTO();
@@ -147,9 +139,7 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/products/price_percent/{percentage}/{id_negocio}/{proveedor}", name="app_products_price_percent", methods={"GET"})
-     */
+    #[Route('/products/price_percent/{percentage}/{id_negocio}/{proveedor}', name: 'app_products_price_percent', methods: ['GET'])]
     public function percentage_price_product(ValidatorInterface $validator, ProductsService $products_service, $percentage, $id_negocio, $proveedor): JsonResponse
     {
         if ($percentage === null || $id_negocio === null) {
@@ -176,9 +166,7 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/products/stock", name="app_products_stock", methods={"POST"})
-     */
+    #[Route('/products/stock', name: 'app_products_stock', methods: ['POST'])]
     public function product_stock(Request $request, ValidatorInterface $validator, ProductsService $products_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -212,11 +200,7 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-
-
-    /**
-     * @Route("/trasladar_products", name="app_trasladar_products", methods={"POST"})
-     */
+    #[Route('/trasladar_products', name: 'app_trasladar_products', methods: ['POST'])]
     public function trasladar_productos(Request $request, ValidatorInterface $validator, ProductsService $product_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -267,9 +251,7 @@ class ProductsController extends BaseController
         return $this->respuesta(400, $datosDto, ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/editOneProduct", name="app_editOneProduct", methods={"POST"})
-     */
+    #[Route('/editOneProduct', name: 'app_editOneProduct', methods: ['POST'])]
     public function editOneProduct(Request $request, ValidatorInterface $validator, ProductsService $product_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -302,10 +284,7 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-
-    /**
-     * @Route("/precio_producto_sin_token/{code}/{id_negocio}", name="app_precio_producto_sin_token", methods={"GET"})
-     */
+    #[Route('/precio_producto_sin_token/{code}/{id_negocio}', name: 'app_precio_producto_sin_token', methods: ['GET'])]
     public function one_(ValidatorInterface $validator, ProductsService $products_service, string $code, int $id_negocio): JsonResponse
     {
         $dto = new OneProductDTO();

@@ -14,15 +14,12 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/negocio")
- */
+
+#[Route('/api/negocio')]
 class NegocioController extends BaseController
 {
 
-    /**
-     * @Route("/obtener_negocios/{id}", name="app_obtener_negocios", methods={"GET"})
-     */
+    #[Route('/obtener_negocios/{id}', name: 'app_obtener_negocios', methods: ['GET'])]
     public function obtener_negocios(Request $request, ServicioNegocio $servicio_negocio, int $id): JsonResponse
     {
         try {
@@ -41,9 +38,7 @@ class NegocioController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/nuevo_negocio", name="app_add_negocio", methods={"POST"})
-     */
+    #[Route('/nuevo_negocio', name: 'app_add_negocio', methods: ['POST'])]
     public function add_negocio(Request $request, ValidatorInterface $validator, ServicioNegocio $negocio_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -77,9 +72,7 @@ class NegocioController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/eliminar_negocio", name="app_delete_negocio", methods={"POST"})
-     */
+    #[Route('/eliminar_negocio', name: 'app_delete_negocio', methods: ['POST'])]
     public function delete_negocio(Request $request, ValidatorInterface $validator, ServicioNegocio $negocio_service): JsonResponse
     {
         $this->request_to_json($request);

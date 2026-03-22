@@ -8,15 +8,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/clientes")
- */
+
+#[Route('/api/clientes')]
 class ClientesController extends BaseController
 {
 
-    /**
-     * @Route("/obtener_clientes/{id_negocio}", name="app_obtener_clientes", methods={"GET"})
-     */
+    #[Route('/obtener_clientes/{id_negocio}', name: 'app_obtener_clientes', methods: ['GET'])]
     public function change_product(Request $request, ValidatorInterface $validator, ClientesService $clientes_service, $id_negocio): JsonResponse
     {
         try {

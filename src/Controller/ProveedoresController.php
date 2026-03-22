@@ -11,14 +11,10 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/proveedores")
- */
+#[Route('/api/proveedores')]
 class ProveedoresController extends BaseController
 {
-    /**
-     * @Route("/proveedores_list/{id_local}", name="app_proveedores_list", methods={"GET"})
-     */
+    #[Route('/proveedores_list/{id_local}', name: 'app_proveedores_list', methods: ['GET'])]
     public function list_proveedores(Request $request, ValidatorInterface $validator, ProveedoresService $proveedores_service, int $id_local): JsonResponse
     {
         try {
@@ -33,9 +29,7 @@ class ProveedoresController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/proveedor", name="app_proveedor_add", methods={"POST"})
-     */
+    #[Route('/proveedor', name: 'app_proveedor_add', methods: ['POST'])]
     public function add_proveedor(Request $request, ValidatorInterface $validator, ProveedoresService $proveedor_service): JsonResponse
     {
         $this->request_to_json($request);

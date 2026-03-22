@@ -8,15 +8,11 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/report")
- */
+#[Route('/api/report')]
 class ReportController extends BaseController
 {
 
-    /**
-     * @Route("/salesProduct/{id_negocio}", name="app_salesProduct_report", methods={"GET"})
-     */
+    #[Route('/salesProduct/{id_negocio}', name: 'app_salesProduct_report', methods: ['GET'])]
     public function salesProduct_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $id_negocio): JsonResponse
     {
         try {
@@ -30,9 +26,7 @@ class ReportController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/incomesExpenses/{month}/{year}/{id_negocio}", name="app_incomes_expenses", methods={"GET"})
-     */
+    #[Route('/incomesExpenses/{month}/{year}/{id_negocio}', name: 'app_incomes_expenses', methods: ['GET'])]
     public function incomes_expenses_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $month, int $year, int $id_negocio): JsonResponse
     {
         try {

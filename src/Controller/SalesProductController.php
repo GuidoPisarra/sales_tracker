@@ -14,15 +14,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/salesProduct")
- */
+
+#[Route('/api/salesProduct')]
 class SalesProductController extends BaseController
 {
 
-    /**
-     * @Route("/salesProduct", name="app_salesProduct_list", methods={"GET"})
-     */
+    #[Route('/salesProduct', name: 'app_salesProduct_list', methods: ['GET'])]
     public function salesProduct_list(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {
         try {
@@ -36,9 +33,7 @@ class SalesProductController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/salesProduct", name="app_add_salesProduct", methods={"POST"})
-     */
+    #[Route('/salesProduct', name: 'app_add_salesProduct', methods: ['POST'])]
     public function salesProduct_add(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -90,9 +85,7 @@ class SalesProductController extends BaseController
         return $this->respuesta(400, $datosDto, ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/salesProduct/delete", name="app_delete_salesProduct", methods={"POST"})
-     */
+    #[Route('/salesProduct/delete', name: 'app_delete_salesProduct', methods: ['POST'])]
     public function salesProduct_delete(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {
         $this->request_to_json($request);
@@ -125,9 +118,7 @@ class SalesProductController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/salesProduct/register", name="app_registe_salesProduct", methods={"POST"})
-     */
+    #[Route('/salesProduct/register', name: 'app_registe_salesProduct', methods: ['POST'])]
     public function salesProduct_register(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {
         $this->request_to_json($request);

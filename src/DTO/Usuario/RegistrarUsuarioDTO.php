@@ -13,6 +13,10 @@ class RegistrarUsuarioDTO
     protected $role;
     protected $token;
 
+    public function __construct(
+        protected UsuarioRepository $usuarioRepository
+    ) {}
+
     public function to_array(): array
     {
         $respuesta = [];

@@ -11,15 +11,11 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/changes")
- */
+#[Route('/api/changes')]
 class ChangesController extends BaseController
 {
 
-    /**
-     * @Route("/change", name="app_change", methods={"POST"})
-     */
+    #[Route('/change', name: 'app_change', methods: ['POST'])]
     public function change_product(Request $request, ValidatorInterface $validator, ChangeProductService $change_service): JsonResponse
     {
         $this->request_to_json($request);

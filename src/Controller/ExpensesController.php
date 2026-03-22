@@ -10,15 +10,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/expenses")
- */
+
+#[Route('/api/expenses')]
 class ExpensesController extends BaseController
 {
 
-    /**
-     * @Route("/expenses/{id_negocio}", name="app_expenses_list", methods={"GET"})
-     */
+    #[Route('/expenses/{id_negocio}', name: 'app_expenses_list', methods: ['GET'])]
     public function expenses_list(Request $request, ValidatorInterface $validator, ExpenseService $expense_service, int $id_negocio): JsonResponse
     {
         try {
@@ -31,9 +28,8 @@ class ExpensesController extends BaseController
         // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
-    /**
-     * @Route("/expenses", name="app_add_expense", methods={"POST"})
-     */
+
+    #[Route('/expenses', name: 'app_add_expense', methods: ['POST'])]
     public function add_expense(Request $request, ValidatorInterface $validator, ExpenseService $expense_service): JsonResponse
     {
         $this->request_to_json($request);

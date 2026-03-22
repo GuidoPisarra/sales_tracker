@@ -14,15 +14,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-/**
- * @Route("/api/cuenta_corriente")
- */
+#[Route('/api/cuenta_corriente')]
 class CuentaCorrienteController extends BaseController
 {
 
-    /**
-     * @Route("/obtener_cuentas_corrientes/{id_negocio}", name="app_obtener_cuentas_corrientes", methods={"GET"})
-     */
+
+    #[Route('/obtener_cuentas_corrientes/{id_negocio}', name: 'app_obtener_cuentas_corrientes', methods: ['GET'])]
     public function cuentas_list(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, int $id_negocio): JsonResponse
     {
         try {
@@ -36,9 +33,8 @@ class CuentaCorrienteController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/obtener_cuentas_corrientes_con_deuda/{id_negocio}", name="app_obtener_cuentas_corrientes_con_deuda", methods={"GET"})
-     */
+
+    #[Route('/obtener_cuentas_corrientes_con_deuda/{id_negocio}', name: 'app_obtener_cuentas_corrientes_con_deuda', methods: ['GET'])]
     public function cuentass_list_con_deuda(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, int $id_negocio): JsonResponse
     {
         try {
@@ -52,9 +48,7 @@ class CuentaCorrienteController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/agregar_venta_cuenta_corriente", name="app_agregar_venta_cuenta_corriente", methods={"POST"})
-     */
+    #[Route('/agregar_venta_cuenta_corriente', name: 'app_agregar_venta_cuenta_corriente', methods: ['POST'])]
     public function add_agregar_venta_cuenta_corriente(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service): JsonResponse
     {
         $this->request_to_json($request);
@@ -87,9 +81,7 @@ class CuentaCorrienteController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/obtener_movimientos_cliente/{id}", name="app_obtener_movimientos_cliente", methods={"GET"})
-     */
+    #[Route('/obtener_movimientos_cliente/{id}', name: 'app_obtener_movimientos_cliente', methods: ['GET'])]
     public function obtener_movimientos_cliente(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, int $id): JsonResponse
     {
         try {
@@ -103,9 +95,7 @@ class CuentaCorrienteController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/agregar_pago", name="app_agregar_pago", methods={"POST"})
-     */
+    #[Route('/agregar_pago', name: 'app_agregar_pago', methods: ['POST'])]
     public function add_agregar_pago(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service): JsonResponse
     {
         $this->request_to_json($request);
@@ -138,9 +128,7 @@ class CuentaCorrienteController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    /**
-     * @Route("/agregar_cliente", name="app_agregar_cliente", methods={"POST"})
-     */
+    #[Route('/agregar_cliente', name: 'app_agregar_cliente', methods: ['POST'])]
     public function add_agregar_cliente(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service): JsonResponse
     {
         $this->request_to_json($request);
