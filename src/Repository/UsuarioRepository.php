@@ -61,7 +61,7 @@ class UsuarioRepository extends BaseRepository
     {
 
 
-        $query = $this->get_bbdd()->prepare('SELECT id, role, id_negocio,sucursal FROM user WHERE email = :email');
+        $query = $this->get_bbdd()->prepare('SELECT id, role, id_negocio,sucursal,name FROM user WHERE email = :email AND eliminado <> 1');
         $query->bindParam(':email', $user);
         $query->execute();
         $resultados = $query->fetchAll(PDO::FETCH_ASSOC);

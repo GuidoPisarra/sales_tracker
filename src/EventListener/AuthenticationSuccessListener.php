@@ -39,7 +39,8 @@ class AuthenticationSuccessListener
             'id' => $datos_usuario['id'],
             'rol' => $datos_usuario['role'],
             'id_negocio' => $datos_usuario['id_negocio'],
-            'sucursal' => $datos_usuario['sucursal']
+            'sucursal' => $datos_usuario['sucursal'],
+            'nombre' => $datos_usuario['name']
         ];
 
         $event->setData($data);
