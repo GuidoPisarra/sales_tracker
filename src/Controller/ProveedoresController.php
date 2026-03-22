@@ -3,9 +3,8 @@
 namespace App\Controller;
 
 use App\DTO\Proveedores\AddProveedorDTO;
-use App\Form\Type\Proveedores\AddProvvedorType;
+use App\Form\Type\Proveedores\AddProveedorType;
 use App\Service\ProveedoresService;
-use App\Service\ProveedorService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
@@ -34,7 +33,7 @@ class ProveedoresController extends BaseController
     {
         $this->request_to_json($request);
         $dto = new AddProveedorDTO();
-        $form = $this->createForm(AddProvvedorType::class, $dto);
+        $form = $this->createForm(AddProveedorType::class, $dto);
         $form->handleRequest($request);
 
         $errores = $this->obtener_validaciones($validator, $dto);
