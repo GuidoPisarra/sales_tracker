@@ -91,7 +91,7 @@ class Usuario implements UserInterface
     {
         $respuesta = [];
 
-        $respuesta['id'] = $this->get_id();
+        $respuesta['id'] = $this->getId();
         $respuesta['nombre'] = $this->get_nombre();
         $respuesta['password'] = $this->get_password();
         $respuesta['roles'] = $this->get_roles();
