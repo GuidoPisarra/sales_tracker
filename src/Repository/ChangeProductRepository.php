@@ -13,9 +13,9 @@ class ChangeProductRepository extends BaseRepository
         $idNegocio = $id_negocio;
         $query = $this->get_bbdd()->prepare('SELECT c.id_producto_cambio, c.precio_producto_cambio, c.id_producto_nuevo, c.precio_producto_nuevo, c.id_negocio, 
                 c.fecha_cambio, p.description descripcion_nuevo, pr.description descripcion_cambio
-        FROM saleTrackerTEST.cambios c
-        LEFT JOIN saleTrackerTEST.product p ON p.id =  c.id_producto_nuevo
-		LEFT JOIN saleTrackerTEST.product pr ON pr.id =  c.id_producto_cambio
+        FROM cambios c
+        LEFT JOIN product p ON p.id =  c.id_producto_nuevo
+		LEFT JOIN product pr ON pr.id =  c.id_producto_cambio
         WHERE c.id_negocio = :id_negocio');
         $query->bindParam(':id_negocio', $idNegocio);
         $query->execute();

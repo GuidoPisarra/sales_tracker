@@ -37,6 +37,12 @@ services:
             - '@security.user_password_hasher'
             - '@App\Repository\UsuarioRepository'
             - '@lexik_jwt_authentication.jwt_manager'
+
+    App\Service\EmpleadosUsuario:
+        arguments:
+            - '@security.user_password_hasher'
+            - '@App\RepositoryEmpleadosRepository'
+            - '@lexik_jwt_authentication.jwt_manager'
     
     App\Service\AppLogs:
         arguments:

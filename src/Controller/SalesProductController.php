@@ -53,7 +53,7 @@ class SalesProductController extends BaseController
             $dto->setIdProduct($venta['id']);
             $dto->setSaleDay($fechaFormateada);
             $dto->setPrice($venta['salePrice']);
-            $dto->setQuantity($venta['quantity']);
+            $dto->setQuantity($venta['cantidad']);
             $dto->setTypePayment($venta['typePayment']);
             $dto->setIdNegocio($venta['id_negocio']);
             $dto->setSucursal($venta['sucursal']);
