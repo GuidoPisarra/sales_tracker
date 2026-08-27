@@ -7,6 +7,19 @@ use PDO;
 class ClientesRepository extends BaseRepository
 {
 
+    /**
+     * Negocio real dueño de un cliente, para validar antes de exponer sus movimientos o
+     * asociarlo a una venta.
+     */
+    public function obtenerIdNegocio(int $id_cliente): ?int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT id_negocio FROM clientes WHERE id = :id');
+        $query->bindParam(':id', $id_cliente);
+        $query->execute();
+        $fila = $query->fetch(PDO::FETCH_ASSOC);
+        return $fila ? (int) $fila['id_negocio'] : null;
+    }
+
     public function list_clientes(int $id_negocio): ?array
     {
         $idNegocio = $id_negocio;

@@ -11,6 +11,11 @@ class Usuario implements UserInterface
     protected $email;
     protected $password;
     protected $roles;
+    // Hidratados por PDO::FETCH_CLASS (SELECT * FROM user) al autenticar cada request.
+    // No confundir con getRoles() (roles de Symfony Security): esto es el campo "role" de negocio.
+    protected $id_negocio;
+    protected $role;
+    protected $sucursal;
 
     public function __construct()
     {
@@ -85,6 +90,21 @@ class Usuario implements UserInterface
     public function get_password(): ?string
     {
         return $this->password;
+    }
+
+    public function getIdNegocio(): ?int
+    {
+        return $this->id_negocio !== null ? (int) $this->id_negocio : null;
+    }
+
+    public function get_role(): ?string
+    {
+        return $this->role;
+    }
+
+    public function get_sucursal(): ?string
+    {
+        return $this->sucursal;
     }
 
     public function to_array(): array

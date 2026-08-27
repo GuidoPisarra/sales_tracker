@@ -8,10 +8,10 @@ use PDO;
 
 class SalesProductRepository extends BaseRepository
 {
-    public function list_salesProduct(): ?array
+    public function list_salesProduct(int $id_negocio): ?array
     {
-        $query = $this->get_bbdd()->prepare('SELECT id id, description description,price price,id_sucursal id_sucursal, date_expense date_expense FROM expense');
-
+        $query = $this->get_bbdd()->prepare('SELECT id id, description description,price price,id_sucursal id_sucursal, date_expense date_expense FROM expense WHERE id_negocio = :id_negocio');
+        $query->bindParam(':id_negocio', $id_negocio);
         $query->execute();
         $query->setFetchMode(PDO::FETCH_ASSOC);
         $salesProduct = $query->fetchAll();
@@ -21,6 +21,18 @@ class SalesProductRepository extends BaseRepository
         }
 
         return $salesProduct;
+    }
+
+    /**
+     * Negocio real dueño de una venta (sales_product), para validar antes de borrarla/registrarla.
+     */
+    public function obtenerIdNegocioVenta(int $idSaleProduct): ?int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT id_negocio FROM sales_product WHERE id_sale = :id LIMIT 1');
+        $query->bindParam(':id', $idSaleProduct);
+        $query->execute();
+        $fila = $query->fetch(PDO::FETCH_ASSOC);
+        return $fila ? (int) $fila['id_negocio'] : null;
     }
 
     public function save_salesProduct(array $datosDto): ?bool

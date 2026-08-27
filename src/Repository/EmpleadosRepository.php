@@ -22,6 +22,18 @@ class EmpleadosRepository extends BaseRepository
     return $expenses;
   }
 
+  /**
+   * Negocio real al que pertenece un empleado, para validar antes de tocarlo.
+   */
+  public function obtenerIdNegocio(int $id_employee): ?int
+  {
+    $query = $this->get_bbdd()->prepare('SELECT id_negocio FROM user WHERE id = :id');
+    $query->bindParam(':id', $id_employee);
+    $query->execute();
+    $fila = $query->fetch(PDO::FETCH_ASSOC);
+    return $fila ? (int) $fila['id_negocio'] : null;
+  }
+
   public function delete_employee(int $id_employee): bool
   {
     $query = $this->get_bbdd()->prepare('UPDATE user SET eliminado = 1 WHERE  id = :id_employee');

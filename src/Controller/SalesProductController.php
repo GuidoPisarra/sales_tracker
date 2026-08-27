@@ -23,7 +23,8 @@ class SalesProductController extends BaseController
     public function salesProduct_list(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {
         try {
-            $list_salesProduct = $salesProduct_service->list_salesProduct();
+            // Siempre el negocio del usuario autenticado: esta ruta no recibe id_negocio por URL.
+            $list_salesProduct = $salesProduct_service->list_salesProduct($this->idNegocioUsuarioActual());
             return $this->respuesta(200, $list_salesProduct, []);
         } catch (\Throwable $th) {
             //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
@@ -48,6 +49,7 @@ class SalesProductController extends BaseController
 
         // Formatear la fecha al formato deseado (YYYY-MM-DD)
         $fechaFormateada = $fechaArgentina->format('Y-m-d H:i:s');
+        $idNegocioUsuario = $this->idNegocioUsuarioActual();
         foreach ($datos as $venta) {
             $dto = new AddSalesProductDTO();
             $dto->setIdProduct($venta['id']);
@@ -55,7 +57,8 @@ class SalesProductController extends BaseController
             $dto->setPrice($venta['salePrice']);
             $dto->setQuantity($venta['cantidad']);
             $dto->setTypePayment($venta['typePayment']);
-            $dto->setIdNegocio($venta['id_negocio']);
+            // El id_negocio nunca se toma del body: siempre el del usuario autenticado.
+            $dto->setIdNegocio((string) $idNegocioUsuario);
             $dto->setSucursal($venta['sucursal']);
             $dto->setUsuario($venta['usuario']);
             $this->createForm(AddSalesProductType::class, $dto);
@@ -105,6 +108,13 @@ class SalesProductController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $idNegocioReal = $salesProduct_service->obtenerIdNegocioVenta($dto->getIdSaleProduct());
+            if ($idNegocioReal === null) {
+                return $this->respuesta(404, [], ['Venta no encontrada'], 404);
+            }
+            if ($check = $this->negocioPermitido($idNegocioReal)) {
+                return $check;
+            }
             try {
                 $sales_product_delete = $salesProduct_service->delete_salesProduct($dto);
                 return $this->respuesta(200, [$sales_product_delete], []);
@@ -138,6 +148,13 @@ class SalesProductController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $idNegocioReal = $salesProduct_service->obtenerIdNegocioVenta($dto->getIdSaleProduct());
+            if ($idNegocioReal === null) {
+                return $this->respuesta(404, [], ['Venta no encontrada'], 404);
+            }
+            if ($check = $this->negocioPermitido($idNegocioReal)) {
+                return $check;
+            }
             try {
                 $sales_product_delete = $salesProduct_service->register_salesProduct($dto);
                 return $this->respuesta(200, [$sales_product_delete], []);

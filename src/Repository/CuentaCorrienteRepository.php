@@ -116,6 +116,18 @@ class CuentaCorrienteRepository extends BaseRepository
         return $pagos;
     }
 
+    /**
+     * Negocio real dueño de una cuenta corriente (ctacte), para validar antes de imputar un pago.
+     */
+    public function obtenerIdNegocioCtaCte(int $id_cta_cte): ?int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT id_negocio FROM ctacte WHERE id = :id');
+        $query->bindParam(':id', $id_cta_cte);
+        $query->execute();
+        $fila = $query->fetch(PDO::FETCH_ASSOC);
+        return $fila ? (int) $fila['id_negocio'] : null;
+    }
+
     public function agregar_pago(PagoDTO $pago)
     {
         $dto = $pago->to_array();

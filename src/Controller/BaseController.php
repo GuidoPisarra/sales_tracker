@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Model\Usuario;
 use App\Service\AppLogs;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -10,6 +11,29 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class BaseController extends AbstractController
 {
+    /**
+     * Devuelve el id_negocio del usuario autenticado por JWT (nunca el que mande el cliente).
+     */
+    protected function idNegocioUsuarioActual(): ?int
+    {
+        $usuario = $this->getUser();
+        return $usuario instanceof Usuario ? $usuario->getIdNegocio() : null;
+    }
+
+    /**
+     * Verifica que el id_negocio pedido en la request sea el mismo del usuario autenticado.
+     * Devolver null significa "autorizado, seguir"; si devuelve una JsonResponse hay que
+     * retornarla inmediatamente (403) y no continuar con la acción.
+     */
+    protected function negocioPermitido($idNegocioSolicitado): ?JsonResponse
+    {
+        $idNegocioUsuario = $this->idNegocioUsuarioActual();
+        if ($idNegocioUsuario === null || (int) $idNegocioSolicitado !== $idNegocioUsuario) {
+            return $this->respuesta(403, [], ['No tiene permisos sobre este negocio.'], 403);
+        }
+        return null;
+    }
+
     public function request_to_json(Request $request)
     {
         $data = json_decode($request->getContent(), true);

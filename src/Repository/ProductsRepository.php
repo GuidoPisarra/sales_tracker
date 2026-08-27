@@ -16,6 +16,18 @@ use App\Model\Product;
 class ProductsRepository extends BaseRepository
 {
 
+    /**
+     * Negocio real dueño de un producto, para validar antes de modificarlo/borrarlo.
+     */
+    public function obtenerIdNegocio(int $id_producto): ?int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT id_negocio FROM product WHERE id = :id');
+        $query->bindParam(':id', $id_producto);
+        $query->execute();
+        $fila = $query->fetch(PDO::FETCH_ASSOC);
+        return $fila ? (int) $fila['id_negocio'] : null;
+    }
+
     public function list_products(int $id_local): ?array
     {
         $query = $this->get_bbdd()->prepare('SELECT p.id AS id, n.sucursal AS sucursal, n.nombre AS nombreSucursal, p.description AS description,

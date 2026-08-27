@@ -15,6 +15,10 @@ class ReportController extends BaseController
     #[Route('/salesProduct/{id_negocio}', name: 'app_salesProduct_report', methods: ['GET'])]
     public function salesProduct_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $id_negocio): JsonResponse
     {
+        if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
+
         try {
             $report_sales_product = $report_service->report_salesProduct($id_negocio);
             return $this->respuesta(200, $report_sales_product, []);
@@ -29,6 +33,10 @@ class ReportController extends BaseController
     #[Route('/incomesExpenses/{month}/{year}/{id_negocio}', name: 'app_incomes_expenses', methods: ['GET'])]
     public function incomes_expenses_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $month, int $year, int $id_negocio): JsonResponse
     {
+        if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
+
         try {
             $report_incomes_expenses = $report_service->report_incomes_expenses($month, $year, $id_negocio);
 

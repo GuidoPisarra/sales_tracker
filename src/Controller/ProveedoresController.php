@@ -16,6 +16,11 @@ class ProveedoresController extends BaseController
     #[Route('/proveedores_list/{id_local}', name: 'app_proveedores_list', methods: ['GET'])]
     public function list_proveedores(Request $request, ValidatorInterface $validator, ProveedoresService $proveedores_service, int $id_local): JsonResponse
     {
+        // id_local es en realidad el id_negocio (ver ProveedoresRepository::list_proveedores).
+        if ($check = $this->negocioPermitido($id_local)) {
+            return $check;
+        }
+
         try {
             $a = $id_local;
             $list_products = $proveedores_service->list_proveedores($id_local);
@@ -43,6 +48,8 @@ class ProveedoresController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // El id_negocio nunca se toma del body: siempre el del usuario autenticado.
+            $dto->setIdNegocio((string) $this->idNegocioUsuarioActual());
             try {
                 $resultado = $proveedor_service->add_proveedor($dto);
                 if ($resultado !== true) {

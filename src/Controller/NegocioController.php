@@ -22,6 +22,10 @@ class NegocioController extends BaseController
     #[Route('/obtener_negocios/{id}', name: 'app_obtener_negocios', methods: ['GET'])]
     public function obtener_negocios(Request $request, ServicioNegocio $servicio_negocio, int $id): JsonResponse
     {
+        if ($check = $this->negocioPermitido($id)) {
+            return $check;
+        }
+
         try {
             $listado = $servicio_negocio->list_negocios($id);
             $respuesta = [
@@ -87,6 +91,9 @@ class NegocioController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            if ($check = $this->negocioPermitido($dto->getIdNegocio())) {
+                return $check;
+            }
             try {
                 $resultado = $negocio_service->delete_negocio($dto);
                 if ($resultado !== true) {

@@ -17,4 +17,9 @@ class ClientesService
     {
         return $this->rep_expense->list_clientes($id_negocio);
     }
+
+    public function obtenerIdNegocio(int $id_cliente): ?int
+    {
+        return $this->rep_expense->obtenerIdNegocio($id_cliente);
+    }
 }

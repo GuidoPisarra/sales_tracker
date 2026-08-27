@@ -26,6 +26,11 @@ class ProductsController extends BaseController
     #[Route('/products_list/{id_local}', name: 'app_products_list', methods: ['GET'])]
     public function list_products(Request $request, ValidatorInterface $validator, ProductsService $products_service, int $id_local): JsonResponse
     {
+        // id_local es en realidad el id_negocio (ver ProductsRepository::list_products).
+        if ($check = $this->negocioPermitido($id_local)) {
+            return $check;
+        }
+
         try {
             $a = $id_local;
             $list_products = $products_service->list_products($id_local);
@@ -51,6 +56,8 @@ class ProductsController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // El id_negocio nunca se toma del body: siempre el del usuario autenticado.
+            $dto->setIdNegocio((string) $this->idNegocioUsuarioActual());
             try {
                 $resultado = $products_service->add_product($dto);
                 if ($resultado !== true) {
@@ -84,6 +91,13 @@ class ProductsController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $idNegocioReal = $products_service->obtenerIdNegocio($dto->getId());
+            if ($idNegocioReal === null) {
+                return $this->respuesta(404, [], ['Producto no encontrado'], 404);
+            }
+            if ($check = $this->negocioPermitido($idNegocioReal)) {
+                return $check;
+            }
             try {
                 $resultado = $products_service->del_product($dto);
                 if ($resultado !== true) {
@@ -106,6 +120,10 @@ class ProductsController extends BaseController
     #[Route('/products_one/{code}/{id_negocio}', name: 'app_products_get_one', methods: ['GET'])]
     public function one_product(ValidatorInterface $validator, ProductsService $products_service, string $code, int $id_negocio): JsonResponse
     {
+        if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
+
         $dto = new OneProductDTO();
         $form = $this->createForm(OneProductType::class, $dto);
         $dto->setCode($code);
@@ -143,6 +161,9 @@ class ProductsController extends BaseController
             //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], [], 400);
         }
+        if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
 
         try {
             $resultado = $products_service->products_price_percentage($percentage, $id_negocio, $proveedor);
@@ -178,6 +199,13 @@ class ProductsController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            $idNegocioReal = $products_service->obtenerIdNegocio((int) $dto->getId());
+            if ($idNegocioReal === null) {
+                return $this->respuesta(404, [], ['Producto no encontrado'], 404);
+            }
+            if ($check = $this->negocioPermitido($idNegocioReal)) {
+                return $check;
+            }
             try {
                 $resultado = $products_service->add_stock_product($dto);
                 if ($resultado !== true) {
@@ -205,8 +233,15 @@ class ProductsController extends BaseController
         $datos = $request->request->all();
         $errores =  false;
         $datosDto = [];
+        $idNegocioUsuario = $this->idNegocioUsuarioActual();
 
         foreach ($datos as $producto) {
+            // El producto de origen tiene que ser del negocio del usuario autenticado.
+            $idNegocioReal = $product_service->obtenerIdNegocio((int) $producto['id']);
+            if ($idNegocioReal === null || $idNegocioReal !== $idNegocioUsuario) {
+                return $this->respuesta(403, [], ['No tiene permisos sobre este negocio.'], 403);
+            }
+
             $dto = new TrasladoProductDTO();
             $dto->setCode($producto['code']);
             $dto->setCodeCanvas($producto['codeCanvas']);
@@ -214,7 +249,9 @@ class ProductsController extends BaseController
             $dto->setDescription($producto['description']);
             $dto->setId($producto['id']);
             $dto->setIdProveedor($producto['idProveedor']);
-            $dto->setIdNegocio($producto['id_negocio']);
+            // El id_negocio nunca se toma del body: siempre el del usuario autenticado
+            // (no se puede trasladar un producto hacia/desde un negocio ajeno).
+            $dto->setIdNegocio($idNegocioUsuario);
             $dto->setQuantity($producto['quantity']);
             $dto->setSalePrice($producto['salePrice']);
             $dto->setSize($producto['size']);
@@ -262,6 +299,13 @@ class ProductsController extends BaseController
             return $this->respuesta(400, [], $errores, 400);
         }
         if ($form->isSubmitted() && $form->isValid()) {
+            $idNegocioReal = $product_service->obtenerIdNegocio((int) $dto->getId());
+            if ($idNegocioReal === null) {
+                return $this->respuesta(404, [], ['Producto no encontrado'], 404);
+            }
+            if ($check = $this->negocioPermitido($idNegocioReal)) {
+                return $check;
+            }
             try {
                 $resultado = $product_service->add_stock_product_edit($dto);
                 if ($resultado !== true) {

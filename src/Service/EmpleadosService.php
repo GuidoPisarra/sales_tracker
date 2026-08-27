@@ -26,6 +26,11 @@ class EmpleadosService
     $this->jwt_manager = $jwt_manager;
   }
 
+  public function obtenerIdNegocio(int $idEmpleado): ?int
+  {
+    return $this->empleadosRepository->obtenerIdNegocio($idEmpleado);
+  }
+
   public function listarPorNegocio(int $idNegocio): array
   {
     $empleados = $this->empleadosRepository->listarPorNegocio($idNegocio);

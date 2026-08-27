@@ -18,6 +18,10 @@ class ExpensesController extends BaseController
     #[Route('/expenses/{id_negocio}', name: 'app_expenses_list', methods: ['GET'])]
     public function expenses_list(Request $request, ValidatorInterface $validator, ExpenseService $expense_service, int $id_negocio): JsonResponse
     {
+        if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
+
         try {
             $list_expense = $expense_service->list_expense($id_negocio);
             return $this->respuesta(200, $list_expense, []);
@@ -44,6 +48,8 @@ class ExpensesController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // El id_negocio nunca se toma del body: siempre el del usuario autenticado.
+            $dto->setIdNegocio($this->idNegocioUsuarioActual());
             try {
                 $resultado = $expense_service->add_expense($dto);
                 if ($resultado !== true) {

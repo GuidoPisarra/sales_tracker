@@ -6,6 +6,7 @@ use App\DTO\ChangesProduct\ChangeProductDTO;
 use App\Form\Type\ChangeProduct\ChangeProductType;
 use App\Service\ChangeProductService;
 use App\Service\ExpenseService;
+use App\Service\ProductsService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
@@ -16,7 +17,7 @@ class ChangesController extends BaseController
 {
 
     #[Route('/change', name: 'app_change', methods: ['POST'])]
-    public function change_product(Request $request, ValidatorInterface $validator, ChangeProductService $change_service): JsonResponse
+    public function change_product(Request $request, ValidatorInterface $validator, ChangeProductService $change_service, ProductsService $products_service): JsonResponse
     {
         $this->request_to_json($request);
         $dto = new ChangeProductDTO();
@@ -30,6 +31,16 @@ class ChangesController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // Los dos productos involucrados en el cambio tienen que ser del negocio del usuario autenticado.
+            $idNegocioUsuario = $this->idNegocioUsuarioActual();
+            $idNegocioCambio = $products_service->obtenerIdNegocio($dto->getIdProductoCambio());
+            $idNegocioNuevo = $products_service->obtenerIdNegocio($dto->getIdProductoNuevo());
+            if ($idNegocioCambio === null || $idNegocioNuevo === null
+                || $idNegocioCambio !== $idNegocioUsuario || $idNegocioNuevo !== $idNegocioUsuario) {
+                return $this->respuesta(403, [], ['No tiene permisos sobre este negocio.'], 403);
+            }
+            // El id_negocio nunca se toma del body: siempre el del usuario autenticado.
+            $dto->setIdNegocio($idNegocioUsuario);
             try {
                 $resultado = $change_service->add_change($dto);
                 if ($resultado !== true) {

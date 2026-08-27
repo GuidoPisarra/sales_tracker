@@ -16,6 +16,10 @@ class ClientesController extends BaseController
     #[Route('/obtener_clientes/{id_negocio}', name: 'app_obtener_clientes', methods: ['GET'])]
     public function change_product(Request $request, ValidatorInterface $validator, ClientesService $clientes_service, $id_negocio): JsonResponse
     {
+        if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
+
         try {
             $list_clientes = $clientes_service->list_clientes($id_negocio);
             return $this->respuesta(200, $list_clientes, []);

@@ -22,6 +22,11 @@ class ProductsService
         return $this->rep_products->list_products($id_local);
     }
 
+    public function obtenerIdNegocio(int $id_producto): ?int
+    {
+        return $this->rep_products->obtenerIdNegocio($id_producto);
+    }
+
     public function add_product(AddProductDTO $dto)
     {
         return $this->rep_products->add_product($dto, $this->get_fecha_hora_actual());

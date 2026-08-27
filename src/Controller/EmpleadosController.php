@@ -26,6 +26,10 @@ class EmpleadosController extends BaseController
    */
   public function listar(int $id_negocio): JsonResponse
   {
+    if ($check = $this->negocioPermitido($id_negocio)) {
+      return $check;
+    }
+
     try {
       $empleados = $this->empleadosService->listarPorNegocio($id_negocio);
       return $this->respuesta(200, $empleados, []);
@@ -43,6 +47,14 @@ class EmpleadosController extends BaseController
    */
   public function delete_employee(int $id_employee): JsonResponse
   {
+    $idNegocioReal = $this->empleadosService->obtenerIdNegocio($id_employee);
+    if ($idNegocioReal === null) {
+      return $this->respuesta(404, [], ['Empleado no encontrado'], 404);
+    }
+    if ($check = $this->negocioPermitido($idNegocioReal)) {
+      return $check;
+    }
+
     try {
       $ok = $this->empleadosService->delete_employee($id_employee);
       return $this->respuesta(200, [$ok], []);
@@ -71,6 +83,10 @@ class EmpleadosController extends BaseController
         return $this->respuesta(400, [], ['Datos inválidos o faltantes']);
       }
 
+      // El id_negocio nunca se toma del body: siempre el del usuario autenticado,
+      // para que no se pueda crear un empleado en un negocio ajeno.
+      $dto->setIdNegocio($this->idNegocioUsuarioActual());
+
       $nuevoEmpleado = $this->empleadosService->crearEmpleado($dto);
 
       if (!$nuevoEmpleado) {
@@ -87,6 +103,14 @@ class EmpleadosController extends BaseController
    */
   public function actualizar(int $id_employee, Request $request): JsonResponse
   {
+    $idNegocioReal = $this->empleadosService->obtenerIdNegocio($id_employee);
+    if ($idNegocioReal === null) {
+      return $this->respuesta(404, [], ['Empleado no encontrado'], 404);
+    }
+    if ($check = $this->negocioPermitido($idNegocioReal)) {
+      return $check;
+    }
+
     try {
       $data = json_decode($request->getContent(), true) ?? [];
       $dto = new EmpleadoDTO();
@@ -102,6 +126,9 @@ class EmpleadosController extends BaseController
       if (!$form->isValid()) {
         return $this->respuesta(400, [], ['Datos inválidos o faltantes']);
       }
+
+      // El id_negocio nunca se toma del body: ya lo validamos arriba contra el empleado real.
+      $dto->setIdNegocio($idNegocioReal);
 
       // 3. Enviamos el ID y el DTO (que ahora sí incluye el ID adentro)
       $ok = $this->empleadosService->actualizarEmpleado($id_employee, $dto);

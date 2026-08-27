@@ -80,6 +80,11 @@ class CuentaCorrienteService
         return $todos_los_movimientos;
     }
 
+    public function obtenerIdNegocioCtaCte(int $id_cta_cte): ?int
+    {
+        return $this->rep_cta_cte->obtenerIdNegocioCtaCte($id_cta_cte);
+    }
+
     public function agregar_pago(PagoDTO $pago): bool
     {
         $zonaHorariaArgentina = new \DateTimeZone('America/Argentina/Buenos_Aires');

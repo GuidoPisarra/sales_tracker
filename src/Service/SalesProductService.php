@@ -15,9 +15,14 @@ class SalesProductService
         $this->rep_salesProduct = $rep_salesProduct;
     }
 
-    public function list_salesProduct()
+    public function list_salesProduct(int $id_negocio)
     {
-        return $this->rep_salesProduct->list_salesProduct();
+        return $this->rep_salesProduct->list_salesProduct($id_negocio);
+    }
+
+    public function obtenerIdNegocioVenta(int $idSaleProduct): ?int
+    {
+        return $this->rep_salesProduct->obtenerIdNegocioVenta($idSaleProduct);
     }
 
     public function save_salesProduct(array $datosDto)
