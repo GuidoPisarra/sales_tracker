@@ -20,6 +20,12 @@ class BaseController extends AbstractController
         return $usuario instanceof Usuario ? $usuario->getIdNegocio() : null;
     }
 
+    protected function idUsuarioActual(): ?int
+    {
+        $usuario = $this->getUser();
+        return $usuario instanceof Usuario ? $usuario->getId() : null;
+    }
+
     /**
      * Verifica que el id_negocio pedido en la request sea el mismo del usuario autenticado.
      * Devolver null significa "autorizado, seguir"; si devuelve una JsonResponse hay que

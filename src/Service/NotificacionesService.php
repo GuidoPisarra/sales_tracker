@@ -17,4 +17,14 @@ class NotificacionesService
     {
         return $this->rep_notificaciones->obtenerPorUsuario($idUsuario, $idNegocio);
     }
+
+    public function obtenerPropietario(int $idNotificacion): ?array
+    {
+        return $this->rep_notificaciones->obtenerPropietario($idNotificacion);
+    }
+
+    public function marcarLeida(int $idNotificacion): bool
+    {
+        return $this->rep_notificaciones->marcarLeida($idNotificacion);
+    }
 }
