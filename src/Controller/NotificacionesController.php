@@ -12,19 +12,18 @@ class NotificacionesController extends BaseController
     #[Route('/{id}/leida', name: 'app_notificacion_marcar_leida', methods: ['PATCH'])]
     public function marcarLeida(int $id, NotificacionesService $notificaciones_service): JsonResponse
     {
-        $propietario = $notificaciones_service->obtenerPropietario($id);
-        if ($propietario === null) {
+        $usuarioIdNotificacion = $notificaciones_service->obtenerUsuarioId($id);
+        if ($usuarioIdNotificacion === null) {
             return $this->respuesta(404, [], ['Notificación no encontrada'], 404);
         }
 
-        $idNegocioUsuario = $this->idNegocioUsuarioActual();
         $idUsuario = $this->idUsuarioActual();
-        $esBroadcast = (int) $propietario['usuario_id'] === 0;
-        $esPropia = (int) $propietario['usuario_id'] === $idUsuario;
+        $esBroadcast = $usuarioIdNotificacion === 0;
+        $esPropia = $usuarioIdNotificacion === $idUsuario;
 
-        // Solo se puede marcar como leída una notificación del propio negocio,
-        // y que sea puntual del usuario o un broadcast (usuario_id = 0).
-        if ((int) $propietario['id_negocio'] !== $idNegocioUsuario || (!$esBroadcast && !$esPropia)) {
+        // Mismo criterio que obtenerPorUsuario (el listado del login): no se filtra por
+        // negocio, solo tiene que ser propia del usuario o un broadcast (usuario_id = 0).
+        if (!$esBroadcast && !$esPropia) {
             return $this->respuesta(403, [], ['No tiene permisos sobre esta notificación.'], 403);
         }
 

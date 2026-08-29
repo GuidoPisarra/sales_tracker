@@ -18,9 +18,9 @@ class NotificacionesService
         return $this->rep_notificaciones->obtenerPorUsuario($idUsuario, $idNegocio);
     }
 
-    public function obtenerPropietario(int $idNotificacion): ?array
+    public function obtenerUsuarioId(int $idNotificacion): ?int
     {
-        return $this->rep_notificaciones->obtenerPropietario($idNotificacion);
+        return $this->rep_notificaciones->obtenerUsuarioId($idNotificacion);
     }
 
     public function marcarLeida(int $idNotificacion): bool

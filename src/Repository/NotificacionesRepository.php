@@ -23,15 +23,17 @@ class NotificacionesRepository extends BaseRepository
     }
 
     /**
-     * Negocio y usuario dueños de una notificación, para validar antes de marcarla leída.
+     * usuario_id de una notificación, para validar antes de marcarla leída.
+     * Mismo criterio que obtenerPorUsuario: no se filtra por negocio, solo por usuario_id
+     * (propia o broadcast con usuario_id = 0).
      */
-    public function obtenerPropietario(int $idNotificacion): ?array
+    public function obtenerUsuarioId(int $idNotificacion): ?int
     {
-        $query = $this->get_bbdd()->prepare('SELECT id_negocio, usuario_id FROM notificaciones WHERE id = :id');
+        $query = $this->get_bbdd()->prepare('SELECT usuario_id FROM notificaciones WHERE id = :id');
         $query->bindParam(':id', $idNotificacion);
         $query->execute();
         $fila = $query->fetch(PDO::FETCH_ASSOC);
-        return $fila ?: null;
+        return $fila ? (int) $fila['usuario_id'] : null;
     }
 
     public function marcarLeida(int $idNotificacion): bool
