@@ -7,6 +7,7 @@ use Lexik\Bundle\JWTAuthenticationBundle\Event\AuthenticationSuccessEvent;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use App\Service\NotificacionesService;
+use App\Service\PlanService;
 use App\Service\ServicioUsuario;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
@@ -16,13 +17,15 @@ class AuthenticationSuccessListener
     private $servicioUsuario;
     private $logs;
     private $notificacionesService;
+    private $planService;
 
-    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service)
+    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service, PlanService $plan_service)
     {
         $this->requestStack = $requestStack;
         $this->servicioUsuario = $servicio_usuario;
         $this->logs =  $logs;
         $this->notificacionesService = $notificaciones_service;
+        $this->planService = $plan_service;
     }
     public function onAuthenticationSuccess(AuthenticationSuccessEvent $event)
     {
@@ -42,6 +45,8 @@ class AuthenticationSuccessListener
             (int) $datos_usuario['id_negocio']
         );
 
+        $plan = $this->planService->obtenerPorNegocio((int) $datos_usuario['id_negocio']);
+
         $data = [
             'token' => $data['token'],
             'id' => $datos_usuario['id'],
@@ -49,7 +54,8 @@ class AuthenticationSuccessListener
             'id_negocio' => $datos_usuario['id_negocio'],
             'sucursal' => $datos_usuario['sucursal'],
             'nombre' => $datos_usuario['name'],
-            'notificaciones' => $notificaciones
+            'notificaciones' => $notificaciones,
+            'plan' => $plan
         ];
 
         $event->setData($data);
