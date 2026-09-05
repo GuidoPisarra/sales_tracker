@@ -22,7 +22,8 @@ class AddStockType extends AbstractType
             ->add('quantity', IntegerType::class)
             ->add('idProveedor', IntegerType::class)
             ->add('size', TextType::class)
-            ->add('code', TextType::class);
+            ->add('code', TextType::class)
+            ->add('barcode', TextType::class, ['required' => false]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

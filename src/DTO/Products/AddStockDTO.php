@@ -13,6 +13,7 @@ class AddStockDTO
     protected $idProveedor;
     protected $code;
     protected $size;
+    protected $barcode;
 
     public function to_array(): array
     {
@@ -25,6 +26,7 @@ class AddStockDTO
         $resultado['idProveedor'] = $this->getIdProveedor();
         $resultado['code'] = $this->getCode();
         $resultado['size'] = $this->getSize();
+        $resultado['barcode'] = $this->getBarcode();
 
         return $resultado;
     }
@@ -106,5 +108,17 @@ class AddStockDTO
     public function getSize(): string
     {
         return $this->size;
+    }
+
+    public function setBarcode(?string $barcode): void
+    {
+        // "" (sin código cargado) se guarda como NULL: así el UNIQUE(id_negocio, barcode)
+        // no choca entre dos productos que no tienen código de barras.
+        $this->barcode = ($barcode === null || $barcode === '') ? null : $barcode;
+    }
+
+    public function getBarcode(): ?string
+    {
+        return $this->barcode;
     }
 }

@@ -23,7 +23,8 @@ class AddProductType extends AbstractType
             ->add('size', TextType::class)
             ->add('code', TextType::class)
             ->add('idSucursal', TextType::class)
-            ->add('idNegocio', TextType::class);
+            ->add('idNegocio', TextType::class)
+            ->add('barcode', TextType::class, ['required' => false]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
