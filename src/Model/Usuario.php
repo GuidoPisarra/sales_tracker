@@ -16,6 +16,7 @@ class Usuario implements UserInterface
     protected $id_negocio;
     protected $role;
     protected $sucursal;
+    protected $asistente_ia;
 
     public function __construct()
     {
@@ -105,6 +106,11 @@ class Usuario implements UserInterface
     public function get_sucursal(): ?string
     {
         return $this->sucursal;
+    }
+
+    public function getAsistenteIa(): bool
+    {
+        return (bool) $this->asistente_ia;
     }
 
     public function to_array(): array

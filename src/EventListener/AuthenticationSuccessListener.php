@@ -40,6 +40,8 @@ class AuthenticationSuccessListener
         }
         $datos_usuario = $this->servicioUsuario->get_rol_id_usuario($user->get_email());
 
+        $this->servicioUsuario->actualizarUltimoIngreso($user->get_email());
+
         $notificaciones = $this->notificacionesService->obtenerPorUsuario(
             (int) $datos_usuario['id'],
             (int) $datos_usuario['id_negocio']
@@ -55,7 +57,8 @@ class AuthenticationSuccessListener
             'sucursal' => $datos_usuario['sucursal'],
             'nombre' => $datos_usuario['name'],
             'notificaciones' => $notificaciones,
-            'plan' => $plan
+            'plan' => $plan,
+            'asistente_ia' => (bool) $datos_usuario['asistente_ia']
         ];
 
         $event->setData($data);

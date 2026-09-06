@@ -61,7 +61,7 @@ class UsuarioRepository extends BaseRepository
     {
 
 
-        $query = $this->get_bbdd()->prepare('SELECT id, role, id_negocio,sucursal,name FROM user WHERE email = :email AND eliminado <> 1');
+        $query = $this->get_bbdd()->prepare('SELECT id, role, id_negocio,sucursal,name, asistente_ia FROM user WHERE email = :email AND eliminado <> 1');
         $query->bindParam(':email', $user);
         $query->execute();
         $resultados = $query->fetchAll(PDO::FETCH_ASSOC);
@@ -70,5 +70,13 @@ class UsuarioRepository extends BaseRepository
             return $resultados[0];
         }
         return $resultados;
+    }
+
+    public function actualizarUltimoIngreso(string $email, string $fecha): bool
+    {
+        $query = $this->get_bbdd()->prepare('UPDATE user SET ultimo_ingreso = :fecha WHERE email = :email');
+        $query->bindParam(':fecha', $fecha);
+        $query->bindParam(':email', $email);
+        return $query->execute();
     }
 }

@@ -68,4 +68,11 @@ class ServicioUsuario
         }
         return null;
     }
+
+    public function actualizarUltimoIngreso(string $email): bool
+    {
+        $timezone = new \DateTimeZone('America/Argentina/Buenos_Aires');
+        $fecha = (new \DateTime('now', $timezone))->format('Y-m-d H:i:s');
+        return $this->rep_usuario->actualizarUltimoIngreso($email, $fecha);
+    }
 }
