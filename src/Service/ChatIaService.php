@@ -9,10 +9,14 @@ class ChatIaService
     private $httpClient;
     private $agenteUrl;
 
-    public function __construct(HttpClientInterface $httpClient, string $agenteUrl)
+    public function __construct(HttpClientInterface $httpClient)
     {
         $this->httpClient = $httpClient;
-        $this->agenteUrl = $agenteUrl;
+        // Igual que el resto del proyecto (ver BaseRepository::get_bbdd()): se lee
+        // directo de $_ENV, sin pasar por el sistema de parámetros %env()% de
+        // Symfony, para no depender de que el compilador del contenedor "vea" el
+        // servicio como usado (falla en prod si no).
+        $this->agenteUrl = $_ENV['AGENTE_IA_URL'] ?? '';
     }
 
     /**

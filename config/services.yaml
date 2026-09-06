@@ -61,12 +61,3 @@ services:
     App\EventListener\JWTCreatedListener:
         tags:
             - { name: kernel.event_listener, event: lexik_jwt_authentication.on_jwt_created, method: onJWTCreated }
-
-    App\Service\ChatIaService:
-        # público: solo se inyecta como argumento de un método de controller, nunca
-        # como dependencia de otro servicio. Si queda privado, el compilador de
-        # Symfony lo marca "no usado" y lo elimina del contenedor en prod, y ahí
-        # el %env(AGENTE_IA_URL)% de abajo queda "declarado pero nunca usado" (error).
-        public: true
-        arguments:
-            $agenteUrl: '%env(AGENTE_IA_URL)%'
