@@ -15,7 +15,7 @@ class PreciosRepository extends BaseRepository
         $query = $this->get_bbdd()->prepare(
             'SELECT id, code, description, sale_price, fecha_actualizado
             FROM product
-            WHERE activo = 0 AND id_negocio = :id_negocio AND fecha_actualizado < :fecha_limite
+            WHERE activo = 0 AND id_negocio = :id_negocio AND fecha_actualizado < :fecha_limite AND quantity > 0
             ORDER BY fecha_actualizado ASC
             LIMIT :limite OFFSET :offset'
         );
@@ -38,7 +38,7 @@ class PreciosRepository extends BaseRepository
         $query = $this->get_bbdd()->prepare(
             'SELECT COUNT(*) AS total
             FROM product
-            WHERE activo = 0 AND id_negocio = :id_negocio AND fecha_actualizado < :fecha_limite'
+            WHERE activo = 0 AND id_negocio = :id_negocio AND fecha_actualizado < :fecha_limite AND quantity > 0'
         );
         $query->bindParam(':id_negocio', $idNegocio);
         $query->bindParam(':fecha_limite', $fechaLimite);
