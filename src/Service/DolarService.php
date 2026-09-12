@@ -5,16 +5,11 @@ namespace App\Service;
 use Symfony\Component\Cache\Adapter\FilesystemAdapter;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-/**
- * La fuente (ArgentinaDatos) no tiene un endpoint por fecha: devuelve TODA la serie histórica
- * del dólar oficial de una sola vez (~5700 registros desde 2011). Por eso se pide una sola vez
- * por request (cacheada 1 hora, la fuente solo actualiza una vez por día hábil) y se arma un
- * mapa fecha -> cotización en memoria, en vez de pegarle a la API por cada producto.
- */
+
 class DolarService
 {
     private const CACHE_KEY = 'dolar_oficial_serie';
-    private const CACHE_TTL = 3600;
+    private const CACHE_TTL = 86400;
 
     private $httpClient;
     private $cache;
@@ -33,10 +28,6 @@ class DolarService
         return $this->obtenerCotizacionEnFecha($hoy);
     }
 
-    /**
-     * $fecha en formato "Y-m-d". Si ese día no tiene cotización (fin de semana/feriado), busca
-     * hacia atrás hasta 10 días.
-     */
     public function obtenerCotizacionEnFecha(string $fecha): ?float
     {
         $serie = $this->obtenerSerieCompleta();
@@ -72,8 +63,7 @@ class DolarService
             $response = $this->httpClient->request('GET', $this->apiUrl, ['timeout' => 15]);
             $datos = $response->toArray();
         } catch (\Throwable $th) {
-            // Si la fuente externa está caída, no tumbamos el listado entero: se devuelve sin
-            // cotizaciones (el service las deja en null) en vez de un 500.
+
             return [];
         }
 
