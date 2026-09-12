@@ -6,6 +6,8 @@ use App\Repository\PreciosRepository;
 
 class PreciosService
 {
+    private const POR_PAGINA = 10;
+
     private $rep_precios;
     private $dolarService;
 
@@ -15,14 +17,19 @@ class PreciosService
         $this->dolarService = $dolarService;
     }
 
-    public function obtenerPreciosDesactualizados(int $idNegocio): array
+    public function obtenerPreciosDesactualizados(int $idNegocio, int $page = 1): array
     {
         $timezone = new \DateTimeZone('America/Argentina/Buenos_Aires');
         $fechaLimite = (new \DateTime('now', $timezone))->modify('-2 months')->format('Y-m-d H:i:s');
 
-        $productos = $this->rep_precios->obtenerDesactualizados($idNegocio, $fechaLimite);
+        $page = max(1, $page);
+        $offset = ($page - 1) * self::POR_PAGINA;
+
+        $total = $this->rep_precios->contarDesactualizados($idNegocio, $fechaLimite);
+        $productos = $this->rep_precios->obtenerDesactualizados($idNegocio, $fechaLimite, self::POR_PAGINA, $offset);
+
         if (!$productos) {
-            return [];
+            return ['total' => $total, 'productos' => []];
         }
 
         $dolarHoy = $this->dolarService->obtenerCotizacionHoy();
@@ -49,6 +56,6 @@ class PreciosService
             ];
         }
 
-        return $resultado;
+        return ['total' => $total, 'productos' => $resultado];
     }
 }
