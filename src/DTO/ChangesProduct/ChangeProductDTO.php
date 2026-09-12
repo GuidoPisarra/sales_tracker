@@ -38,7 +38,7 @@ class ChangeProductDTO
         $this->id_producto_cambio = $id_cambio;
     }
 
-    public function getPrecioProductoCambio(): int
+    public function getPrecioProductoCambio(): float
     {
         return $this->precio_producto_cambio;
     }
