@@ -16,8 +16,6 @@ class ChangeProductService
 
     public function add_change(ChangeProductDTO $dto)
     {
-        $this->rep_change->add_change($dto);
-        $this->rep_change->add_stock($dto);
-        return $this->rep_change->discount_stock($dto);
+        return $this->rep_change->realizarCambio($dto);
     }
 }

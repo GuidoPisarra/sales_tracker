@@ -29,23 +29,60 @@ class ChangeProductRepository extends BaseRepository
         return $changes;
     }
 
-    public function add_change(ChangeProductDTO $dto): bool
+    /**
+     * Registra el cambio y ajusta el stock de los dos productos (+1 al que se devuelve, -1 al
+     * nuevo) en una sola transacción — si algo falla a mitad de camino, no queda nada a medio
+     * aplicar. También rechaza el cambio si el producto nuevo no tiene stock disponible.
+     */
+    public function realizarCambio(ChangeProductDTO $dto): bool
     {
-        $query = $this->get_bbdd()->prepare('INSERT INTO cambios 
-        (id_producto_cambio, precio_producto_cambio, id_producto_nuevo, precio_producto_nuevo, id_negocio, fecha_cambio)
-        VALUES (:id_producto_cambio, :precio_producto_cambio, :id_producto_nuevo, :precio_producto_nuevo, :id_negocio, :fecha_cambio)');
+        $datos = $dto->to_array();
+        $pdo = $this->get_bbdd();
 
-        $newChange = $dto->to_array();
-        $query->bindParam(':id_producto_cambio', $newChange["id_producto_cambio"]);
-        $query->bindParam(':precio_producto_cambio', $newChange["precio_producto_cambio"]);
-        $query->bindParam(':id_producto_nuevo', $newChange["id_producto_nuevo"]);
-        $query->bindParam(':precio_producto_nuevo', $newChange["precio_producto_nuevo"]);
-        $query->bindParam(':id_negocio', $newChange["id_negocio"]);
-        $query->bindParam(':fecha_cambio', $newChange["fecha_cambio"]);
+        $pdo->beginTransaction();
+        try {
+            $queryStock = $pdo->prepare('SELECT quantity FROM product WHERE id = :id FOR UPDATE');
+            $queryStock->bindParam(':id', $datos['id_producto_nuevo']);
+            $queryStock->execute();
+            $fila = $queryStock->fetch(PDO::FETCH_ASSOC);
 
+            if (!$fila || (int) $fila['quantity'] <= 0) {
+                throw new \Exception('El producto nuevo no tiene stock disponible.');
+            }
 
-        $response = $query->execute();
-        return $response;
+            $queryChange = $pdo->prepare('INSERT INTO cambios
+                (id_producto_cambio, precio_producto_cambio, id_producto_nuevo, precio_producto_nuevo, id_negocio, fecha_cambio)
+                VALUES (:id_producto_cambio, :precio_producto_cambio, :id_producto_nuevo, :precio_producto_nuevo, :id_negocio, :fecha_cambio)');
+            $queryChange->bindParam(':id_producto_cambio', $datos['id_producto_cambio']);
+            $queryChange->bindParam(':precio_producto_cambio', $datos['precio_producto_cambio']);
+            $queryChange->bindParam(':id_producto_nuevo', $datos['id_producto_nuevo']);
+            $queryChange->bindParam(':precio_producto_nuevo', $datos['precio_producto_nuevo']);
+            $queryChange->bindParam(':id_negocio', $datos['id_negocio']);
+            $queryChange->bindParam(':fecha_cambio', $datos['fecha_cambio']);
+            if (!$queryChange->execute()) {
+                throw new \Exception('No se pudo registrar el cambio.');
+            }
+
+            $queryDevuelto = $pdo->prepare('UPDATE product SET quantity = quantity + 1 WHERE id = :id');
+            $queryDevuelto->bindParam(':id', $datos['id_producto_cambio']);
+            if (!$queryDevuelto->execute()) {
+                throw new \Exception('No se pudo actualizar el stock del producto devuelto.');
+            }
+
+            $queryNuevo = $pdo->prepare('UPDATE product SET quantity = quantity - 1 WHERE id = :id');
+            $queryNuevo->bindParam(':id', $datos['id_producto_nuevo']);
+            if (!$queryNuevo->execute()) {
+                throw new \Exception('No se pudo actualizar el stock del producto nuevo.');
+            }
+
+            $pdo->commit();
+            return true;
+        } catch (\Throwable $th) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $th;
+        }
     }
 
     public function report_changes(int $month, int $year, int $id_negocio): ?float
@@ -69,35 +106,5 @@ class ChangeProductRepository extends BaseRepository
         }
 
         return $changes[0];
-    }
-
-    public function add_stock(ChangeProductDTO $dto): bool
-    {
-        $query = $this->get_bbdd()->prepare('UPDATE product p SET p.quantity = p.quantity + :quantity WHERE p.id = :id');
-
-        $newProduct = $dto->to_array();
-        $activo = 0;
-        $cant = 1;
-        $query->bindParam(':id', $newProduct["id_producto_cambio"]);
-        $query->bindParam(':quantity', $cant);
-
-        $response = $query->execute();
-
-        return $response;
-    }
-
-    public function discount_stock(ChangeProductDTO $dto): bool
-    {
-        $query = $this->get_bbdd()->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id ');
-
-        $newProduct = $dto->to_array();
-        $activo = 0;
-        $cant = 1;
-        $query->bindParam(':id', $newProduct["id_producto_nuevo"]);
-        $query->bindParam(':quantity', $cant);
-
-        $response = $query->execute();
-
-        return $response;
     }
 }
