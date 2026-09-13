@@ -5,6 +5,7 @@ namespace App\Form\Type\CuentaCorriente;
 use App\DTO\CuentaCorriente\ClienteDTO;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
+use Symfony\Component\Form\Extension\Core\Type\MoneyType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -19,7 +20,8 @@ class ClienteType extends AbstractType
             ->add('apellido', TextType::class)
             ->add('nombre', TextType::class)
             ->add('telefono', TextType::class)
-            ->add('id_negocio', IntegerType::class);
+            ->add('id_negocio', IntegerType::class)
+            ->add('limite_credito', MoneyType::class, ['required' => false]);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

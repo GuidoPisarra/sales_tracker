@@ -199,4 +199,80 @@ class CuentaCorrienteController extends BaseController
         // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
+
+    #[Route('/editar_cliente/{id}', name: 'app_editar_cliente', methods: ['PATCH'])]
+    public function editar_cliente(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, ClientesService $clientes_service, int $id): JsonResponse
+    {
+        $idNegocioCliente = $clientes_service->obtenerIdNegocio($id);
+        if ($idNegocioCliente === null) {
+            return $this->respuesta(404, [], ['Cliente no encontrado'], 404);
+        }
+        if ($check = $this->negocioPermitido($idNegocioCliente)) {
+            return $check;
+        }
+
+        $data = json_decode($request->getContent(), true) ?? [];
+        $dto = new ClienteDTO();
+        $dto->setId($id);
+
+        $form = $this->createForm(ClienteType::class, $dto);
+        // false: los campos ausentes en el body no se tocan (PATCH parcial), no se borran.
+        $form->submit($data, false);
+
+        $errores = $this->obtener_validaciones($validator, $dto);
+        if (count($errores) > 0) {
+            return $this->respuesta(400, [], $errores, 400);
+        }
+
+        // El id_negocio nunca se toma del body: siempre el real del cliente, ya validado arriba.
+        $dto->setIdNegocio($idNegocioCliente);
+
+        try {
+            $resultado = $service->actualizar_cliente($dto);
+            if ($resultado !== true) {
+                throw new \Exception('No se pudo actualizar el cliente');
+            }
+            return $this->respuesta(200, ['OK' => 'OK'], []);
+        } catch (\Throwable $th) {
+            return $this->respuesta(400, [], [$th->getMessage()], 400);
+        }
+    }
+
+    #[Route('/anular_pago/{id}', name: 'app_anular_pago', methods: ['DELETE'])]
+    public function anular_pago(CuentaCorrienteService $service, int $id): JsonResponse
+    {
+        $idNegocioPago = $service->obtenerIdNegocioPago($id);
+        if ($idNegocioPago === null) {
+            return $this->respuesta(404, [], ['Pago no encontrado'], 404);
+        }
+        if ($check = $this->negocioPermitido($idNegocioPago)) {
+            return $check;
+        }
+
+        try {
+            $service->anular_pago($id);
+            return $this->respuesta(200, ['OK' => 'OK'], []);
+        } catch (\Throwable $th) {
+            return $this->respuesta(400, [], [$th->getMessage()], 400);
+        }
+    }
+
+    #[Route('/anular_venta/{id}', name: 'app_anular_venta_cta_cte', methods: ['DELETE'])]
+    public function anular_venta(CuentaCorrienteService $service, int $id): JsonResponse
+    {
+        $idNegocioCtaCte = $service->obtenerIdNegocioCtaCte($id);
+        if ($idNegocioCtaCte === null) {
+            return $this->respuesta(404, [], ['Cuenta corriente no encontrada'], 404);
+        }
+        if ($check = $this->negocioPermitido($idNegocioCtaCte)) {
+            return $check;
+        }
+
+        try {
+            $service->anular_venta($id);
+            return $this->respuesta(200, ['OK' => 'OK'], []);
+        } catch (\Throwable $th) {
+            return $this->respuesta(400, [], [$th->getMessage()], 400);
+        }
+    }
 }

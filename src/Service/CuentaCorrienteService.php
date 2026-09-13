@@ -31,9 +31,23 @@ class CuentaCorrienteService
 
     public function add_agregar_venta_cuenta_corriente(NuevaVentaCtaCteDTO $dto)
     {
-        $datosDto = [];
         $lista_ventas = $dto->getVenta();
         $cliente = $dto->getCliente();
+
+        $totalVenta = 0.0;
+        foreach ($lista_ventas as $venta) {
+            $totalVenta += $venta->getPrice() * $venta->getQuantity();
+        }
+
+        $limiteCredito = $this->rep_cta_cte->obtenerLimiteCredito((int) $cliente->getId());
+        if ($limiteCredito !== null && $limiteCredito > 0) {
+            $deudaActual = $this->rep_cta_cte->obtenerDeudaActual((int) $cliente->getId());
+            if ($deudaActual + $totalVenta > $limiteCredito) {
+                throw new \Exception('Esta venta supera el límite de crédito del cliente.');
+            }
+        }
+
+        $datosDto = [];
         $zonaHorariaArgentina = new \DateTimeZone('America/Argentina/Buenos_Aires');
         $fechaArgentina = new \DateTime('now', $zonaHorariaArgentina);
         $fechaFormateada = $fechaArgentina->format('Y-m-d H:i:s');
@@ -97,5 +111,25 @@ class CuentaCorrienteService
     public function agregar_cliente(ClienteDTO $cliente): bool
     {
         return $this->rep_cta_cte->agregar_cliente($cliente);
+    }
+
+    public function actualizar_cliente(ClienteDTO $cliente): bool
+    {
+        return $this->rep_cta_cte->actualizarCliente($cliente);
+    }
+
+    public function obtenerIdNegocioPago(int $idPago): ?int
+    {
+        return $this->rep_cta_cte->obtenerIdNegocioPago($idPago);
+    }
+
+    public function anular_pago(int $idPago): bool
+    {
+        return $this->rep_cta_cte->anularPago($idPago);
+    }
+
+    public function anular_venta(int $idCtaCte): bool
+    {
+        return $this->rep_cta_cte->anularVentaCtaCte($idCtaCte);
     }
 }

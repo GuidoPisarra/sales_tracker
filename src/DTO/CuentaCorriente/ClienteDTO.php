@@ -11,6 +11,7 @@ class ClienteDTO
     protected $dni;
     protected $id_negocio;
     protected $telefono;
+    protected $limite_credito;
 
     public function getId(): ?int
     {
@@ -22,7 +23,7 @@ class ClienteDTO
         $this->id = $id;
     }
 
-    public function getIdNegocio(): int
+    public function getIdNegocio(): ?int
     {
         return $this->id_negocio;
     }
@@ -32,7 +33,7 @@ class ClienteDTO
         $this->id_negocio = $id_negocio;
     }
 
-    public function getNombre(): string
+    public function getNombre(): ?string
     {
         return $this->nombre;
     }
@@ -42,7 +43,7 @@ class ClienteDTO
         $this->nombre = $nombre;
     }
 
-    public function getApellido(): string
+    public function getApellido(): ?string
     {
         return $this->apellido;
     }
@@ -62,7 +63,7 @@ class ClienteDTO
         $this->telefono = $telefono;
     }
 
-    public function getDni(): int
+    public function getDni(): ?int
     {
         return $this->dni;
     }
@@ -70,6 +71,16 @@ class ClienteDTO
     public function setDni(int $dni): void
     {
         $this->dni = $dni;
+    }
+
+    public function getLimiteCredito(): ?float
+    {
+        return $this->limite_credito;
+    }
+
+    public function setLimiteCredito(?float $limite_credito): void
+    {
+        $this->limite_credito = $limite_credito;
     }
 
     public function to_array(): array
@@ -82,6 +93,7 @@ class ClienteDTO
         $respuesta['apellido'] = $this->getApellido();
         $respuesta['id_negocio'] = $this->getIdNegocio();
         $respuesta['telefono'] = $this->getTelefono();
+        $respuesta['limite_credito'] = $this->getLimiteCredito();
 
         return $respuesta;
     }
