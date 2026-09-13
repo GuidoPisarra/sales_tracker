@@ -8,24 +8,29 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use App\Service\NotificacionesService;
 use App\Service\PlanService;
+use App\Service\PreciosService;
 use App\Service\ServicioUsuario;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class AuthenticationSuccessListener
 {
+    private const ROL_ADMIN = 'ROLE_TITULAR';
+
     private $requestStack;
     private $servicioUsuario;
     private $logs;
     private $notificacionesService;
     private $planService;
+    private $preciosService;
 
-    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service, PlanService $plan_service)
+    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service, PlanService $plan_service, PreciosService $precios_service)
     {
         $this->requestStack = $requestStack;
         $this->servicioUsuario = $servicio_usuario;
         $this->logs =  $logs;
         $this->notificacionesService = $notificaciones_service;
         $this->planService = $plan_service;
+        $this->preciosService = $precios_service;
     }
     public function onAuthenticationSuccess(AuthenticationSuccessEvent $event)
     {
@@ -49,6 +54,14 @@ class AuthenticationSuccessListener
 
         $plan = $this->planService->obtenerPorNegocio((int) $datos_usuario['id_negocio']);
 
+        // El conteo de precios desactualizados solo tiene sentido para quien puede hacer algo
+        // con ese dato (dueño/admin del negocio) — para un empleado queda en null.
+        $roles = json_decode($datos_usuario['role'] ?? '', true);
+        $esAdmin = is_array($roles) && in_array(self::ROL_ADMIN, $roles, true);
+        $preciosDesactualizados = $esAdmin
+            ? $this->preciosService->contarPreciosDesactualizados((int) $datos_usuario['id_negocio'])
+            : null;
+
         $data = [
             'token' => $data['token'],
             'id' => $datos_usuario['id'],
@@ -58,7 +71,8 @@ class AuthenticationSuccessListener
             'nombre' => $datos_usuario['name'],
             'notificaciones' => $notificaciones,
             'plan' => $plan,
-            'asistente_ia' => (bool) $datos_usuario['asistente_ia']
+            'asistente_ia' => (bool) $datos_usuario['asistente_ia'],
+            'precios_desactualizados' => $preciosDesactualizados
         ];
 
         $event->setData($data);

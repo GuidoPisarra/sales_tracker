@@ -19,6 +19,18 @@ class PreciosService
         $this->inflacionService = $inflacionService;
     }
 
+    /**
+     * Solo el conteo, sin dólar/inflación — pensado para engancharse en flujos livianos
+     * (como el login) donde no vale la pena pagar el costo de esas dos APIs externas.
+     */
+    public function contarPreciosDesactualizados(int $idNegocio): int
+    {
+        $timezone = new \DateTimeZone('America/Argentina/Buenos_Aires');
+        $fechaLimite = (new \DateTime('now', $timezone))->modify('-2 months')->format('Y-m-d H:i:s');
+
+        return $this->rep_precios->contarDesactualizados($idNegocio, $fechaLimite);
+    }
+
     public function obtenerPreciosDesactualizados(int $idNegocio, int $page = 1): array
     {
         $timezone = new \DateTimeZone('America/Argentina/Buenos_Aires');
