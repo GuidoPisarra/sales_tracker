@@ -10,11 +10,13 @@ class PreciosService
 
     private $rep_precios;
     private $dolarService;
+    private $inflacionService;
 
-    public function __construct(PreciosRepository $rep_precios, DolarService $dolarService)
+    public function __construct(PreciosRepository $rep_precios, DolarService $dolarService, InflacionService $inflacionService)
     {
         $this->rep_precios = $rep_precios;
         $this->dolarService = $dolarService;
+        $this->inflacionService = $inflacionService;
     }
 
     public function obtenerPreciosDesactualizados(int $idNegocio, int $page = 1): array
@@ -44,15 +46,31 @@ class PreciosService
                 $precioSugerido = round(((float) $producto['sale_price']) * ($dolarHoy / $dolarActualizacion), 2);
             }
 
+            $salePrice = (float) $producto['sale_price'];
+            $costPrice = (float) $producto['cost_price'];
+            // Usa el cost_price de HOY como aproximación del margen que tenía al momento de la
+            // última actualización (no guardamos histórico de costo).
+            $margenActual = $costPrice > 0 ? round(($salePrice - $costPrice) / $costPrice, 4) : null;
+
+            $inflacionAcumulada = $this->inflacionService->obtenerInflacionAcumulada($fechaActualizacion);
+            $inflacionAcumulada = $inflacionAcumulada !== null ? round($inflacionAcumulada, 4) : null;
+
+            $margenAbsorbido = ($margenActual !== null && $inflacionAcumulada !== null)
+                ? $inflacionAcumulada > $margenActual
+                : null;
+
             $resultado[] = [
                 'id' => (int) $producto['id'],
                 'code' => $producto['code'],
                 'description' => $producto['description'],
-                'sale_price' => (float) $producto['sale_price'],
+                'sale_price' => $salePrice,
                 'fecha_actualizado' => $producto['fecha_actualizado'],
                 'dolar_actualizacion' => $dolarActualizacion,
                 'dolar_hoy' => $dolarHoy,
                 'precio_sugerido' => $precioSugerido,
+                'inflacion_acumulada' => $inflacionAcumulada,
+                'margen_actual' => $margenActual,
+                'margen_absorbido' => $margenAbsorbido,
             ];
         }
 

@@ -10,6 +10,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 
 class ReportService
 {
+    private const LIMITE_RECIENTES = 20;
+
     protected $rep_report;
     protected $rep_change;
 
@@ -17,6 +19,21 @@ class ReportService
     {
         $this->rep_report = $rep_report;
         $this->rep_change = $rep_change;
+    }
+
+    public function report_salesProduct_recientes(int $id_negocio, int $dias)
+    {
+        $dias = $dias > 0 ? $dias : 15;
+        $filas = $this->rep_report->report_salesProduct_recientes($id_negocio, $dias, self::LIMITE_RECIENTES);
+
+        return array_map(function ($fila) {
+            return [
+                'id' => (int) $fila['id'],
+                'description' => $fila['description'],
+                'sale_price' => (float) $fila['sale_price'],
+                'ultima_venta' => $fila['ultima_venta'],
+            ];
+        }, $filas);
     }
 
     public function report_salesProduct(int $id_negocio)

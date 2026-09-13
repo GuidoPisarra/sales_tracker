@@ -30,6 +30,32 @@ class ReportRepository extends BaseRepository
         return $salesProduct;
     }
 
+    /**
+     * Productos únicos vendidos en los últimos $dias días, ordenados por venta más reciente
+     * primero (para accesos rápidos tipo "vendidos recientemente"), limitado a $limite filas.
+     */
+    public function report_salesProduct_recientes(int $id_negocio, int $dias, int $limite): array
+    {
+        $query = $this->get_bbdd()->prepare(
+            'SELECT sp.id_product AS id, p.description AS description, p.sale_price AS sale_price,
+                MAX(sp.sale_product_date) AS ultima_venta
+            FROM sales_product sp
+            JOIN product p ON p.id = sp.id_product
+            WHERE sp.active = 0 AND sp.id_negocio = :id_negocio
+                AND sp.sale_product_date >= (NOW() - INTERVAL :dias DAY)
+            GROUP BY sp.id_product, p.description, p.sale_price
+            ORDER BY ultima_venta DESC
+            LIMIT :limite'
+        );
+        $query->bindParam(':id_negocio', $id_negocio);
+        $query->bindValue(':dias', $dias, PDO::PARAM_INT);
+        $query->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $query->execute();
+        $query->setFetchMode(PDO::FETCH_ASSOC);
+
+        return $query->fetchAll() ?: [];
+    }
+
     public function report_expenses(int $month, int $year, $id_negocio): ?float
     {
         $query = $this->get_bbdd()->prepare('SELECT COALESCE(SUM(e.price), 0)

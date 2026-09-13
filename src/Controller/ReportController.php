@@ -30,6 +30,23 @@ class ReportController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
+    #[Route('/salesProduct/recientes/{id_negocio}', name: 'app_salesProduct_recientes', methods: ['GET'])]
+    public function salesProduct_recientes(Request $request, ReportService $report_service, int $id_negocio): JsonResponse
+    {
+        if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
+
+        $dias = max(1, (int) $request->query->get('dias', 15));
+
+        try {
+            $resultado = $report_service->report_salesProduct_recientes($id_negocio, $dias);
+            return $this->respuesta(200, $resultado, []);
+        } catch (\Throwable $th) {
+            return $this->respuesta(500, [], ['Error al obtener los productos vendidos recientemente'], 500);
+        }
+    }
+
     #[Route('/incomesExpenses/{month}/{year}/{id_negocio}', name: 'app_incomes_expenses', methods: ['GET'])]
     public function incomes_expenses_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $month, int $year, int $id_negocio): JsonResponse
     {

@@ -13,7 +13,7 @@ class PreciosRepository extends BaseRepository
     public function obtenerDesactualizados(int $idNegocio, string $fechaLimite, int $limite, int $offset): array
     {
         $query = $this->get_bbdd()->prepare(
-            'SELECT id, code, description, sale_price, fecha_actualizado
+            'SELECT id, code, description, sale_price, cost_price, fecha_actualizado
             FROM product
             WHERE activo = 0 AND id_negocio = :id_negocio AND fecha_actualizado < :fecha_limite AND quantity > 0
             ORDER BY fecha_actualizado ASC
