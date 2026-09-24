@@ -10,9 +10,9 @@ class NotificacionesRepository extends BaseRepository
     {
         $query = $this->get_bbdd()->prepare(
             'SELECT n.id, n.titulo, n.mensaje, n.tipo, n.leida, n.created_at
-            FROM notificaciones n
-            LEFT JOIN negocio ne ON ne.id_negocio = :id_negocio
-            WHERE (n.usuario_id = :usuario_id OR n.usuario_id = 0)'
+        FROM notificaciones n
+        WHERE n.id_negocio = :id_negocio
+        AND (n.usuario_id = :usuario_id OR n.usuario_id = 0)'
         );
         $query->bindParam(':id_negocio', $idNegocio);
         $query->bindParam(':usuario_id', $idUsuario);
@@ -21,6 +21,7 @@ class NotificacionesRepository extends BaseRepository
 
         return $query->fetchAll() ?: [];
     }
+
 
     /**
      * usuario_id de una notificación, para validar antes de marcarla leída.
