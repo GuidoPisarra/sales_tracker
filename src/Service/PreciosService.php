@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Repository\NegocioRepository;
 use App\Repository\PreciosRepository;
 
 class PreciosService
@@ -9,12 +10,14 @@ class PreciosService
     private const POR_PAGINA = 10;
 
     private $rep_precios;
+    private $rep_negocio;
     private $dolarService;
     private $inflacionService;
 
-    public function __construct(PreciosRepository $rep_precios, DolarService $dolarService, InflacionService $inflacionService)
+    public function __construct(PreciosRepository $rep_precios, NegocioRepository $rep_negocio, DolarService $dolarService, InflacionService $inflacionService)
     {
         $this->rep_precios = $rep_precios;
+        $this->rep_negocio = $rep_negocio;
         $this->dolarService = $dolarService;
         $this->inflacionService = $inflacionService;
     }
@@ -25,16 +28,18 @@ class PreciosService
      */
     public function contarPreciosDesactualizados(int $idNegocio): int
     {
+        $meses = $this->rep_negocio->obtenerMesesAvisoPrecios($idNegocio);
         $timezone = new \DateTimeZone('America/Argentina/Buenos_Aires');
-        $fechaLimite = (new \DateTime('now', $timezone))->modify('-2 months')->format('Y-m-d H:i:s');
+        $fechaLimite = (new \DateTime('now', $timezone))->modify("-{$meses} months")->format('Y-m-d H:i:s');
 
         return $this->rep_precios->contarDesactualizados($idNegocio, $fechaLimite);
     }
 
     public function obtenerPreciosDesactualizados(int $idNegocio, int $page = 1): array
     {
+        $meses = $this->rep_negocio->obtenerMesesAvisoPrecios($idNegocio);
         $timezone = new \DateTimeZone('America/Argentina/Buenos_Aires');
-        $fechaLimite = (new \DateTime('now', $timezone))->modify('-2 months')->format('Y-m-d H:i:s');
+        $fechaLimite = (new \DateTime('now', $timezone))->modify("-{$meses} months")->format('Y-m-d H:i:s');
 
         $page = max(1, $page);
         $offset = ($page - 1) * self::POR_PAGINA;

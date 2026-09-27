@@ -29,4 +29,14 @@ class ServicioNegocio
     {
         return $this->rep_negocio->delete_negocio($dto);
     }
+
+    public function obtenerMesesAvisoPrecios(int $idNegocio): int
+    {
+        return $this->rep_negocio->obtenerMesesAvisoPrecios($idNegocio);
+    }
+
+    public function actualizarMesesAvisoPrecios(int $idNegocio, int $meses): bool
+    {
+        return $this->rep_negocio->actualizarMesesAvisoPrecios($idNegocio, $meses);
+    }
 }

@@ -14,7 +14,7 @@ class NegocioRepository extends BaseRepository
     public function list_negocios(int $id_negocio): ?array
     {
         $idNegocio = $id_negocio;
-        $query = $this->get_bbdd()->prepare('SELECT id,id_negocio,nombre, sucursal, domicilio, telefono FROM negocio WHERE id_negocio = :id_negocio');
+        $query = $this->get_bbdd()->prepare('SELECT id,id_negocio,nombre, sucursal, domicilio, telefono, meses_aviso_precios_desactualizados FROM negocio WHERE id_negocio = :id_negocio');
         $query->bindParam(':id_negocio', $idNegocio);
         $query->execute();
         $query->setFetchMode(PDO::FETCH_ASSOC);
@@ -55,5 +55,33 @@ class NegocioRepository extends BaseRepository
 
         $response = $query->execute();
         return $response;
+    }
+
+    /**
+     * "negocio" tiene una fila por sucursal, no una por negocio — cualquiera de esas filas
+     * sirve para leer este valor porque actualizarMesesAvisoPrecios() las mantiene todas
+     * sincronizadas.
+     */
+    public function obtenerMesesAvisoPrecios(int $idNegocio): int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT meses_aviso_precios_desactualizados FROM negocio WHERE id_negocio = :id_negocio LIMIT 1');
+        $query->bindParam(':id_negocio', $idNegocio);
+        $query->execute();
+        $fila = $query->fetch(PDO::FETCH_ASSOC);
+        return $fila && $fila['meses_aviso_precios_desactualizados'] !== null
+            ? (int) $fila['meses_aviso_precios_desactualizados']
+            : 2;
+    }
+
+    /**
+     * Actualiza TODAS las filas (sucursales) de ese id_negocio a la vez, para que no queden
+     * desincronizadas entre sí.
+     */
+    public function actualizarMesesAvisoPrecios(int $idNegocio, int $meses): bool
+    {
+        $query = $this->get_bbdd()->prepare('UPDATE negocio SET meses_aviso_precios_desactualizados = :meses WHERE id_negocio = :id_negocio');
+        $query->bindParam(':meses', $meses, PDO::PARAM_INT);
+        $query->bindParam(':id_negocio', $idNegocio);
+        return $query->execute();
     }
 }

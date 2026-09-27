@@ -112,4 +112,28 @@ class NegocioController extends BaseController
         // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
+
+    #[Route('/meses_aviso_precios', name: 'app_meses_aviso_precios', methods: ['PATCH'])]
+    public function meses_aviso_precios(Request $request, ServicioNegocio $servicio_negocio): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true) ?? [];
+        $meses = isset($data['meses']) ? (int) $data['meses'] : null;
+
+        if ($meses === null || $meses < 1) {
+            return $this->respuesta(400, [], ['El campo "meses" es obligatorio y tiene que ser mayor o igual a 1.'], 400);
+        }
+
+        // Siempre el negocio del usuario autenticado — nunca se recibe id_negocio por body.
+        $idNegocio = $this->idNegocioUsuarioActual();
+
+        try {
+            $resultado = $servicio_negocio->actualizarMesesAvisoPrecios($idNegocio, $meses);
+            if ($resultado !== true) {
+                throw new \Exception('No se pudo actualizar la configuración.');
+            }
+            return $this->respuesta(200, ['OK' => 'OK'], []);
+        } catch (\Throwable $th) {
+            return $this->respuesta(400, [], [$th->getMessage()], 400);
+        }
+    }
 }
