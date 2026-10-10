@@ -100,12 +100,12 @@ class AddStockDTO
         return $this->code;
     }
 
-    public function setSize(string $size): void
+    public function setSize(?string $size): void
     {
         $this->size = $size;
     }
 
-    public function getSize(): string
+    public function getSize(): ?string
     {
         return $this->size;
     }

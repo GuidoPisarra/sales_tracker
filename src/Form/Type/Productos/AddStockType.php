@@ -21,7 +21,7 @@ class AddStockType extends AbstractType
             ->add('salePrice', MoneyType::class)
             ->add('quantity', IntegerType::class)
             ->add('idProveedor', IntegerType::class)
-            ->add('size', TextType::class)
+            ->add('size', TextType::class, ['required' => false])
             ->add('code', TextType::class)
             ->add('barcode', TextType::class, ['required' => false]);
     }
