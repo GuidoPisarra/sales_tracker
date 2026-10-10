@@ -117,8 +117,8 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    #[Route('/products_one/{code}/{id_negocio}', name: 'app_products_get_one', methods: ['GET'])]
-    public function one_product(ValidatorInterface $validator, ProductsService $products_service, string $code, int $id_negocio): JsonResponse
+    #[Route('/products_one/{code}/{id_negocio}/{sucursal}', name: 'app_products_get_one', methods: ['GET'])]
+    public function one_product(ValidatorInterface $validator, ProductsService $products_service, string $code, int $id_negocio, int $sucursal): JsonResponse
     {
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
@@ -128,6 +128,7 @@ class ProductsController extends BaseController
         $form = $this->createForm(OneProductType::class, $dto);
         $dto->setCode($code);
         $dto->setIdNegocio($id_negocio);
+        $dto->setSucursal($sucursal);
         $errores = $this->obtener_validaciones($validator, $dto);
         if (count($errores) > 0) {
             //$this->errores_to_log($errores, $log, 'app_agregar_productos');

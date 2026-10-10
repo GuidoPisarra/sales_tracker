@@ -80,7 +80,7 @@ class SalesProductController extends BaseController
                 return $this->respuesta(200, [$sales_product], []);
             } catch (\Throwable $th) {
                 //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
-                return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
+                return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
             // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);

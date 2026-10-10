@@ -264,7 +264,10 @@ class CuentaCorrienteRepository extends BaseRepository
         $pdo = $this->get_bbdd();
         $pdo->beginTransaction();
         try {
-            $queryCtacte = $pdo->prepare('SELECT id_producto, anulado FROM ctacte WHERE id = :id FOR UPDATE');
+            $queryCtacte = $pdo->prepare('SELECT ctacte.id_producto, ctacte.anulado, sales_product.quantity AS cantidad_vendida
+                FROM ctacte
+                INNER JOIN sales_product ON sales_product.id_sales_product = ctacte.id_sale_product
+                WHERE ctacte.id = :id FOR UPDATE');
             $queryCtacte->bindParam(':id', $idCtaCte);
             $queryCtacte->execute();
             $ctacte = $queryCtacte->fetch(PDO::FETCH_ASSOC);
@@ -290,7 +293,8 @@ class CuentaCorrienteRepository extends BaseRepository
                 throw new \Exception('No se pudo anular la venta.');
             }
 
-            $queryStock = $pdo->prepare('UPDATE product SET quantity = quantity + 1 WHERE id = :id_producto');
+            $queryStock = $pdo->prepare('UPDATE product SET quantity = quantity + :cantidad WHERE id = :id_producto');
+            $queryStock->bindParam(':cantidad', $ctacte['cantidad_vendida']);
             $queryStock->bindParam(':id_producto', $ctacte['id_producto']);
             if (!$queryStock->execute()) {
                 throw new \Exception('No se pudo devolver el stock del producto.');

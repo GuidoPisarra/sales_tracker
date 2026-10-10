@@ -7,12 +7,14 @@ class OneProductDTO
 {
     protected $code;
     protected $idNegocio;
+    protected $sucursal = null;
 
     public function to_array(): array
     {
         $resultado = [];
         $resultado['code'] = $this->getCode();
         $resultado['id_negocio'] = $this->getIdNegocio();
+        $resultado['sucursal'] = $this->getSucursal();
         return $resultado;
     }
 
@@ -34,5 +36,15 @@ class OneProductDTO
     public function getIdNegocio(): string
     {
         return $this->idNegocio;
+    }
+
+    public function setSucursal(?int $sucursal): void
+    {
+        $this->sucursal = $sucursal;
+    }
+
+    public function getSucursal(): ?int
+    {
+        return $this->sucursal;
     }
 }

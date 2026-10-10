@@ -95,11 +95,12 @@ class ProductsRepository extends BaseRepository
 
     public function one_product(OneProductDTO $dto): array
     {
-        $query = $this->get_bbdd()->prepare('SELECT id id, description description,cost_price costPrice,sale_price salePrice,quantity quantity,id_proveedor id_proveedor,code code,size size,activo activo, fecha_actualizado as fechaActualizado FROM product WHERE  code = :code AND activo=0 AND id_negocio = :id_negocio');
+        $query = $this->get_bbdd()->prepare('SELECT id id, description description,cost_price costPrice,sale_price salePrice,quantity quantity,id_proveedor id_proveedor,code code,size size,activo activo, fecha_actualizado as fechaActualizado FROM product WHERE  code = :code AND activo=0 AND id_negocio = :id_negocio AND sucursal = :sucursal');
 
         $newProduct = $dto->to_array();
         $query->bindParam(':code', $newProduct["code"]);
         $query->bindParam(':id_negocio', $newProduct["id_negocio"]);
+        $query->bindParam(':sucursal', $newProduct["sucursal"]);
 
         $query->execute();
         $query->setFetchMode(PDO::FETCH_ASSOC);
@@ -152,17 +153,19 @@ class ProductsRepository extends BaseRepository
 
 
 
-    public function add_products_stcok(AddStockDTO $dto, string $fecha): bool
+    /**
+     * Carga de stock (reponer mercadería): solo suma cantidad. No toca cost_price/sale_price ni
+     * fecha_actualizado — eso es responsabilidad de add_products_stock_edit(), que es la edición
+     * real del producto. Si este método tocara el precio, reponer stock sacaría productos de
+     * "precios desactualizados" sin que el precio se haya revisado de verdad.
+     */
+    public function add_products_stcok(AddStockDTO $dto): bool
     {
-        $query = $this->get_bbdd()->prepare('UPDATE product p SET p.quantity = p.quantity + :quantity , p.cost_price = :costo, p.sale_price = :venta, fecha_actualizado = :fecha WHERE p.id = :id AND p.activo = 0');
+        $query = $this->get_bbdd()->prepare('UPDATE product p SET p.quantity = p.quantity + :quantity WHERE p.id = :id AND p.activo = 0');
 
         $newProduct = $dto->to_array();
-        $activo = 0;
         $query->bindParam(':id', $newProduct["id"]);
         $query->bindParam(':quantity', $newProduct["quantity"]);
-        $query->bindParam(':costo', $newProduct["costPrice"]);
-        $query->bindParam(':venta', $newProduct["salePrice"]);
-        $query->bindParam(':fecha', $fecha);
 
         $response = $query->execute();
         return $response;

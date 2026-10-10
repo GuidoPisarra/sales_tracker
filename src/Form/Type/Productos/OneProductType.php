@@ -17,7 +17,8 @@ class OneProductType extends AbstractType
     {
         $builder
             ->add('code', TextType::class)
-            ->add('idNegocio', TextType::class);
+            ->add('idNegocio', TextType::class)
+            ->add('sucursal', IntegerType::class);
     }
 
     public function configureOptions(OptionsResolver $resolver): void

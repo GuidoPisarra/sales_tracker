@@ -51,7 +51,7 @@ class ProductsService
 
     public function add_stock_product(AddStockDTO $dto)
     {
-        return $this->rep_products->add_products_stcok($dto, $this->get_fecha_hora_actual());
+        return $this->rep_products->add_products_stcok($dto);
     }
 
     public function add_stock_product_edit(AddStockDTO $dto)
