@@ -61,19 +61,7 @@ class ProductsService
 
     public function trasladar_product(array $datos_dto)
     {
-        $productos = [];
-        foreach ($datos_dto as $prod) {
-            $producto_buscado = $this->rep_products->get_one_product_traslado($prod);
-            if (!$producto_buscado) { //el producto no existe en la sucursal
-                $this->rep_products->crear_producto_sucursal($prod);
-                $this->rep_products->actualizar_stock_sucursal_anterior($prod); //sucursal anterior
-            } else { //el producto existe en la sucursal
-                $this->rep_products->actualizar_stock_sucursal_nueva($prod); //sucursal nueva                
-                $this->rep_products->actualizar_stock_sucursal_anterior($prod); //sucursal anterior                
-            }
-            $this->rep_products->eliminar_producto_sin_stock($prod);
-        }
-        return true;
+        return $this->rep_products->realizarTraslado($datos_dto);
     }
 
     private function get_fecha_hora_actual(): string

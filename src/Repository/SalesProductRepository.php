@@ -86,15 +86,16 @@ class SalesProductRepository extends BaseRepository
                 }
                 $idSALEPRODUCT = (int) $pdo->lastInsertId();
 
-                // Solo descuenta si realmente hay stock suficiente; si no afecta ninguna fila,
-                // es porque el stock actual es menor a lo que se quiere vender.
-                $queryStock = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id AND p.quantity >= :quantityMinima');
+                // Solo descuenta si el producto es del negocio del usuario y hay stock
+                // suficiente; si no afecta ninguna fila, es por una de las dos razones.
+                $queryStock = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id AND p.id_negocio = :id_negocio AND p.quantity >= :quantityMinima');
                 $queryStock->bindParam(':id', $newSale["idProduct"]);
+                $queryStock->bindParam(':id_negocio', $newSale["id_negocio"]);
                 $queryStock->bindParam(':quantity', $newSale["quantity"]);
                 $queryStock->bindParam(':quantityMinima', $newSale["quantity"]);
                 $queryStock->execute();
                 if ($queryStock->rowCount() === 0) {
-                    throw new \Exception('No hay stock suficiente para completar la venta de uno de los productos.');
+                    throw new \Exception('No se pudo descontar el stock: el producto no existe en este negocio o no hay stock suficiente.');
                 }
 
                 if ($newSale["typePayment"] === 'Cta Cte') {
