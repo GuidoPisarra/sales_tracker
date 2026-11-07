@@ -158,6 +158,9 @@ class ProductsController extends BaseController
     #[Route('/products/price_percent/{percentage}/{id_negocio}/{proveedor}', name: 'app_products_price_percent', methods: ['GET'])]
     public function percentage_price_product(ValidatorInterface $validator, ProductsService $products_service, $percentage, $id_negocio, $proveedor): JsonResponse
     {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
         if ($percentage === null || $id_negocio === null) {
             //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], [], 400);

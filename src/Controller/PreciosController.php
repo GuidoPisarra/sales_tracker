@@ -13,6 +13,9 @@ class PreciosController extends BaseController
     #[Route('/desactualizados/{id_negocio}', name: 'app_precios_desactualizados', methods: ['GET'])]
     public function desactualizados(int $id_negocio, Request $request, PreciosService $precios_service): JsonResponse
     {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }

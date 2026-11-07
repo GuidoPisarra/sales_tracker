@@ -50,6 +50,9 @@ class ReportController extends BaseController
     #[Route('/incomesExpenses/{month}/{year}/{id_negocio}', name: 'app_incomes_expenses', methods: ['GET'])]
     public function incomes_expenses_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $month, int $year, int $id_negocio): JsonResponse
     {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }

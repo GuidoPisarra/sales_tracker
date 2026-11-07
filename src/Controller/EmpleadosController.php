@@ -26,6 +26,9 @@ class EmpleadosController extends BaseController
    */
   public function listar(int $id_negocio): JsonResponse
   {
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     if ($check = $this->negocioPermitido($id_negocio)) {
       return $check;
     }
@@ -47,6 +50,9 @@ class EmpleadosController extends BaseController
    */
   public function delete_employee(int $id_employee): JsonResponse
   {
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     $idNegocioReal = $this->empleadosService->obtenerIdNegocio($id_employee);
     if ($idNegocioReal === null) {
       return $this->respuesta(404, [], ['Empleado no encontrado'], 404);
@@ -72,6 +78,9 @@ class EmpleadosController extends BaseController
    */
   public function crear(Request $request): JsonResponse
   {
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     try {
       $data = json_decode($request->getContent(), true) ?? [];
       $dto = new EmpleadoDTO();
@@ -103,6 +112,9 @@ class EmpleadosController extends BaseController
    */
   public function actualizar(int $id_employee, Request $request): JsonResponse
   {
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     $idNegocioReal = $this->empleadosService->obtenerIdNegocio($id_employee);
     if ($idNegocioReal === null) {
       return $this->respuesta(404, [], ['Empleado no encontrado'], 404);

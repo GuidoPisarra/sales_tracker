@@ -45,6 +45,9 @@ class NegocioController extends BaseController
     #[Route('/nuevo_negocio', name: 'app_add_negocio', methods: ['POST'])]
     public function add_negocio(Request $request, ValidatorInterface $validator, ServicioNegocio $negocio_service): JsonResponse
     {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
         $this->request_to_json($request);
         $dto = new NegocioDTO();
         $form = $this->createForm(NegocioType::class, $dto);
@@ -57,6 +60,9 @@ class NegocioController extends BaseController
         }
 
         if ($form->isSubmitted() && $form->isValid()) {
+            // La sucursal nueva siempre va al negocio del usuario autenticado,
+            // nunca al id_negocio que mande el cliente.
+            $dto->setIdNegocio((int) $this->idNegocioUsuarioActual());
             try {
                 $resultado = $negocio_service->add_negocio($dto);
                 if ($resultado !== true) {
@@ -79,6 +85,9 @@ class NegocioController extends BaseController
     #[Route('/eliminar_negocio', name: 'app_delete_negocio', methods: ['POST'])]
     public function delete_negocio(Request $request, ValidatorInterface $validator, ServicioNegocio $negocio_service): JsonResponse
     {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
         $this->request_to_json($request);
         $dto = new EliminarNegocioDTO();
         $form = $this->createForm(EliminarNegocioType::class, $dto);
@@ -116,6 +125,9 @@ class NegocioController extends BaseController
     #[Route('/meses_aviso_precios', name: 'app_meses_aviso_precios', methods: ['PATCH'])]
     public function meses_aviso_precios(Request $request, ServicioNegocio $servicio_negocio): JsonResponse
     {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
         $data = json_decode($request->getContent(), true) ?? [];
         $meses = isset($data['meses']) ? (int) $data['meses'] : null;
 
