@@ -28,6 +28,18 @@ class ProductsRepository extends BaseRepository
         return $fila ? (int) $fila['id_negocio'] : null;
     }
 
+    /**
+     * Cantidad de productos activos sin stock (quantity <= 0) del negocio.
+     * Ojo: en la tabla product, activo = 0 significa "activo" (ver list_products).
+     */
+    public function contarSinStock(int $id_negocio): int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT COUNT(*) FROM product WHERE id_negocio = :id_negocio AND activo = 0 AND quantity <= 0');
+        $query->bindValue(':id_negocio', $id_negocio, PDO::PARAM_INT);
+        $query->execute();
+        return (int) $query->fetchColumn();
+    }
+
     public function list_products(int $id_local): ?array
     {
         $query = $this->get_bbdd()->prepare('SELECT p.id AS id, n.sucursal AS sucursal, n.nombre AS nombreSucursal, p.description AS description,
