@@ -18,4 +18,9 @@ class ChangeProductService
     {
         return $this->rep_change->realizarCambio($dto);
     }
+
+    public function add_change_multiple(int $idProductoCambio, float $precioProductoCambio, array $productosNuevos, int $idNegocio): bool
+    {
+        return $this->rep_change->realizarCambioMultiple($idProductoCambio, $precioProductoCambio, $productosNuevos, $idNegocio);
+    }
 }
