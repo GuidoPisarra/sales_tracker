@@ -23,10 +23,8 @@ class ReportController extends BaseController
             $report_sales_product = $report_service->report_salesProduct($id_negocio);
             return $this->respuesta(200, $report_sales_product, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -62,10 +60,8 @@ class ReportController extends BaseController
 
             return $this->respuesta(200, $report_incomes_expenses->to_array(), []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 }

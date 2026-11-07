@@ -151,7 +151,8 @@ class EmpleadosController extends BaseController
 
       return $this->respuesta(200, ['Empleado actualizado correctamente'], []);
     } catch (\Throwable $e) {
-      return $this->respuesta(500, [], ['Error interno al actualizar el empleado: ' . $e->getMessage()]);
+      error_log('app_empleado_actualizar: ' . $e->getMessage());
+      return $this->respuesta(500, [], ['Error interno al actualizar el empleado']);
     }
   }
 }

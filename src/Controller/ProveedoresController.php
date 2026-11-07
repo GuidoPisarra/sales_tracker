@@ -26,10 +26,8 @@ class ProveedoresController extends BaseController
             $list_products = $proveedores_service->list_proveedores($id_local);
             return $this->respuesta(200, $list_products, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -43,7 +41,6 @@ class ProveedoresController extends BaseController
 
         $errores = $this->obtener_validaciones($validator, $dto);
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -53,7 +50,6 @@ class ProveedoresController extends BaseController
             try {
                 $resultado = $proveedor_service->add_proveedor($dto);
                 if ($resultado !== true) {
-                    //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: Ocurrió un error grabando el producto.');
                     throw new \Exception("Ocurrió un error al agregar el producto.");
                 }
                 $respuesta = [
@@ -61,11 +57,9 @@ class ProveedoresController extends BaseController
                 ];
                 return $this->respuesta(200, $respuesta, []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 }

@@ -24,10 +24,8 @@ class ClientesController extends BaseController
             $list_clientes = $clientes_service->list_clientes($id_negocio);
             return $this->respuesta(200, $list_clientes, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los clientes.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 }

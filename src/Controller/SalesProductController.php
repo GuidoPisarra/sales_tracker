@@ -55,7 +55,6 @@ class SalesProductController extends BaseController
         }
 
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -64,10 +63,8 @@ class SalesProductController extends BaseController
                 $sales_product = $salesProduct_service->save_salesProduct($datosDto);
                 return $this->respuesta(200, [$sales_product], []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
-            // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, $datosDto, ['Ocurrió un error desconocido.'], 400);
@@ -88,7 +85,6 @@ class SalesProductController extends BaseController
         }
 
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -104,10 +100,8 @@ class SalesProductController extends BaseController
                 $sales_product_delete = $salesProduct_service->delete_salesProduct($dto);
                 return $this->respuesta(200, [$sales_product_delete], []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
             }
-            // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
@@ -128,7 +122,6 @@ class SalesProductController extends BaseController
         }
 
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -144,10 +137,8 @@ class SalesProductController extends BaseController
                 $sales_product_delete = $salesProduct_service->register_salesProduct($dto);
                 return $this->respuesta(200, [$sales_product_delete], []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
             }
-            // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);

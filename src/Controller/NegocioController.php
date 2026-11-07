@@ -33,12 +33,10 @@ class NegocioController extends BaseController
             ];
             return $this->respuesta(200, $respuesta, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error obteniendo los negocios.'], 400);
         }
 
 
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -55,7 +53,6 @@ class NegocioController extends BaseController
 
         $errores = $this->obtener_validaciones($validator, $dto);
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -66,7 +63,6 @@ class NegocioController extends BaseController
             try {
                 $resultado = $negocio_service->add_negocio($dto);
                 if ($resultado !== true) {
-                    //$log::get_log()->error('ENDPOINT: app_agregar_gastos ERROR: Ocurrió un error grabando el gasto.');
                     throw new \Exception("Ocurrió un error al agregar el producto.");
                 }
                 $respuesta = [
@@ -74,11 +70,9 @@ class NegocioController extends BaseController
                 ];
                 return $this->respuesta(200, $respuesta, []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -95,7 +89,6 @@ class NegocioController extends BaseController
 
         $errores = $this->obtener_validaciones($validator, $dto);
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -106,7 +99,6 @@ class NegocioController extends BaseController
             try {
                 $resultado = $negocio_service->delete_negocio($dto);
                 if ($resultado !== true) {
-                    //$log::get_log()->error('ENDPOINT: app_agregar_gastos ERROR: Ocurrió un error grabando el gasto.');
                     throw new \Exception("Ocurrió un error al agregar el producto.");
                 }
                 $respuesta = [
@@ -114,11 +106,9 @@ class NegocioController extends BaseController
                 ];
                 return $this->respuesta(200, $respuesta, []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
