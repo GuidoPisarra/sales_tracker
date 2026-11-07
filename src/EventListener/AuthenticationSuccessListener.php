@@ -45,21 +45,24 @@ class AuthenticationSuccessListener
         }
         $datos_usuario = $this->servicioUsuario->get_rol_id_usuario($user->get_email());
 
-        $this->servicioUsuario->actualizarUltimoIngreso($user->get_email());
+        // Con PDO en modo excepción, un error en algo accesorio (último
+        // ingreso, notificaciones, plan, conteo de precios) ya no puede dejar a
+        // nadie sin poder entrar: se registra en el log y se sigue.
+        $this->intentar('actualizar último ingreso', fn () => $this->servicioUsuario->actualizarUltimoIngreso($user->get_email()));
 
-        $notificaciones = $this->notificacionesService->obtenerPorUsuario(
+        $notificaciones = $this->intentar('obtener notificaciones', fn () => $this->notificacionesService->obtenerPorUsuario(
             (int) $datos_usuario['id'],
             (int) $datos_usuario['id_negocio']
-        );
+        ), []);
 
-        $plan = $this->planService->obtenerPorNegocio((int) $datos_usuario['id_negocio']);
+        $plan = $this->intentar('obtener plan', fn () => $this->planService->obtenerPorNegocio((int) $datos_usuario['id_negocio']));
 
         // El conteo de precios desactualizados solo tiene sentido para quien puede hacer algo
         // con ese dato (dueño/admin del negocio) — para un empleado queda en null.
         $roles = json_decode($datos_usuario['role'] ?? '', true);
         $esAdmin = is_array($roles) && in_array(self::ROL_ADMIN, $roles, true);
         $preciosDesactualizados = $esAdmin
-            ? $this->preciosService->contarPreciosDesactualizados((int) $datos_usuario['id_negocio'])
+            ? $this->intentar('contar precios desactualizados', fn () => $this->preciosService->contarPreciosDesactualizados((int) $datos_usuario['id_negocio']))
             : null;
 
         $data = [
@@ -76,5 +79,19 @@ class AuthenticationSuccessListener
         ];
 
         $event->setData($data);
+    }
+
+    /**
+     * Ejecuta un paso accesorio del login. Si falla devuelve $siFalla y deja
+     * el detalle en el log del servidor.
+     */
+    private function intentar(string $paso, callable $accion, mixed $siFalla = null): mixed
+    {
+        try {
+            return $accion();
+        } catch (\Throwable $th) {
+            error_log('Login: no se pudo ' . $paso . ': ' . $th->getMessage());
+            return $siFalla;
+        }
     }
 }

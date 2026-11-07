@@ -27,9 +27,12 @@ class BaseRepository
         try {
             // Usamos $_ENV['BD_COM'] que tiene el formato DSN correcto (mysql:host=...;dbname=...)
             $pdo = new PDO($_ENV['BD_COM'], $_ENV['USUARIO_BD_COM'], $_ENV['PASSWORD_BD_COM']);
-            // Se mantiene el modo WARNING: el código existente revisa el resultado de
-            // execute() en vez de esperar excepciones.
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_WARNING);
+            // Modo excepción: antes (WARNING) una consulta con error devolvía false
+            // y, donde nadie revisaba el resultado, el error pasaba en silencio
+            // (respuesta "OK" sin haber guardado nada). Ahora corta la operación:
+            // las transacciones hacen rollBack en su catch y los controllers
+            // responden con su mensaje genérico de error.
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         } catch (PDOException $e) {
             // Antes se hacía die() con el mensaje del error, que puede incluir host y
             // usuario de la base. Ahora el detalle va al log del servidor y el
