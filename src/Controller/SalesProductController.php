@@ -107,6 +107,41 @@ class SalesProductController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
+    /**
+     * Cambia la forma de pago de una venta ya registrada (todas las líneas del mismo id_sale).
+     * Body: { "idSaleProduct": <id_sale>, "typePayment": "efectivo" | "tarjeta" | "dni" | "mercadopago" }.
+     * No pasa a ni desde "Cta Cte": eso implica crear/borrar la deuda del cliente en ctacte.
+     */
+    #[Route('/salesProduct/typePayment', name: 'app_type_payment_salesProduct', methods: ['POST'])]
+    public function salesProduct_type_payment(Request $request, SalesProductService $salesProduct_service): JsonResponse
+    {
+        $this->request_to_json($request);
+        $idSale = (int) $request->request->get('idSaleProduct', 0);
+        $typePayment = trim((string) $request->request->get('typePayment', ''));
+
+        if ($idSale <= 0) {
+            return $this->respuesta(400, [], ['Falta el id de la venta.'], 400);
+        }
+        if (!in_array($typePayment, SalesProductService::FORMAS_PAGO_EDITABLES, true)) {
+            return $this->respuesta(400, [], ['Forma de pago inválida.'], 400);
+        }
+
+        $idNegocioReal = $salesProduct_service->obtenerIdNegocioVenta($idSale);
+        if ($idNegocioReal === null) {
+            return $this->respuesta(404, [], ['Venta no encontrada'], 404);
+        }
+        if ($check = $this->negocioPermitido($idNegocioReal)) {
+            return $check;
+        }
+
+        try {
+            $salesProduct_service->cambiarFormaPago($idSale, $typePayment, $idNegocioReal);
+            return $this->respuesta(200, ['OK' => 'OK', 'typePayment' => $typePayment], []);
+        } catch (\Throwable $th) {
+            return $this->respuesta(400, [], [$th->getMessage()], 400);
+        }
+    }
+
     #[Route('/salesProduct/register', name: 'app_registe_salesProduct', methods: ['POST'])]
     public function salesProduct_register(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {

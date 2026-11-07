@@ -137,4 +137,38 @@ class SalesProductRepository extends BaseRepository
 
         return $delete;
     }
+
+    /**
+     * Cambia la forma de pago de todas las líneas de una venta. Rechaza las ventas en
+     * "Cta Cte" (tienen deuda asociada en ctacte que no se puede convertir así nomás).
+     */
+    public function cambiarFormaPago(int $idSale, string $typePayment, int $idNegocio): bool
+    {
+        $pdo = $this->get_bbdd();
+
+        $queryActual = $pdo->prepare('SELECT type_payment FROM sales_product WHERE id_sale = :idSale AND id_negocio = :id_negocio');
+        $queryActual->bindParam(':idSale', $idSale);
+        $queryActual->bindParam(':id_negocio', $idNegocio);
+        $queryActual->execute();
+        $formasActuales = $queryActual->fetchAll(PDO::FETCH_COLUMN);
+
+        if (!$formasActuales) {
+            throw new \Exception('Venta no encontrada.');
+        }
+        foreach ($formasActuales as $forma) {
+            if (strcasecmp(trim((string) $forma), 'Cta Cte') === 0) {
+                throw new \Exception('No se puede cambiar la forma de pago de una venta en cuenta corriente.');
+            }
+        }
+
+        $query = $pdo->prepare('UPDATE sales_product SET type_payment = :typePayment WHERE id_sale = :idSale AND id_negocio = :id_negocio');
+        $query->bindParam(':typePayment', $typePayment);
+        $query->bindParam(':idSale', $idSale);
+        $query->bindParam(':id_negocio', $idNegocio);
+        if (!$query->execute()) {
+            throw new \Exception('No se pudo actualizar la forma de pago.');
+        }
+
+        return true;
+    }
 }

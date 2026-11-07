@@ -55,4 +55,63 @@ class ChangesController extends BaseController
         }
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
+
+    /**
+     * Cambio de un producto vendido por uno o más productos nuevos.
+     * Body: {
+     *   "id_producto_cambio": 10, "precio_producto_cambio": 5000,
+     *   "productos_nuevos": [ { "id": 20, "precio": 3000, "cantidad": 1 }, { "id": 21, "precio": 2500, "cantidad": 2 } ]
+     * }
+     * Se guarda una fila en "cambios" por cada unidad nueva (la tabla no tiene cantidad) y el
+     * precio del producto devuelto va solo en la primera, así los totales del balance
+     * (SUM(precio_producto_cambio - precio_producto_nuevo)) siguen dando bien.
+     */
+    #[Route('/change_multiple', name: 'app_change_multiple', methods: ['POST'])]
+    public function change_product_multiple(Request $request, ChangeProductService $change_service, ProductsService $products_service): JsonResponse
+    {
+        $this->request_to_json($request);
+        $datos = $request->request->all();
+
+        $idCambio = (int) ($datos['id_producto_cambio'] ?? 0);
+        $precioCambio = $datos['precio_producto_cambio'] ?? null;
+        $nuevosBody = $datos['productos_nuevos'] ?? null;
+
+        if ($idCambio <= 0 || !is_numeric($precioCambio)) {
+            return $this->respuesta(400, [], ['Falta el producto vendido o su precio.'], 400);
+        }
+        if (!is_array($nuevosBody) || count($nuevosBody) === 0) {
+            return $this->respuesta(400, [], ['Tiene que elegir al menos un producto nuevo.'], 400);
+        }
+
+        $nuevos = [];
+        foreach ($nuevosBody as $nuevo) {
+            $id = (int) ($nuevo['id'] ?? 0);
+            $precio = $nuevo['precio'] ?? null;
+            $cantidad = (int) ($nuevo['cantidad'] ?? 1);
+            if ($id <= 0 || !is_numeric($precio) || $cantidad <= 0) {
+                return $this->respuesta(400, [], ['Hay un producto nuevo con datos inválidos.'], 400);
+            }
+            if ($id === $idCambio) {
+                return $this->respuesta(400, [], ['El producto vendido y el nuevo no pueden ser el mismo.'], 400);
+            }
+            $nuevos[] = ['id' => $id, 'precio' => (float) $precio, 'cantidad' => $cantidad];
+        }
+
+        // Todos los productos involucrados tienen que ser del negocio del usuario autenticado.
+        $idNegocioUsuario = $this->idNegocioUsuarioActual();
+        $ids = array_unique(array_merge([$idCambio], array_column($nuevos, 'id')));
+        foreach ($ids as $id) {
+            $idNegocioProducto = $products_service->obtenerIdNegocio($id);
+            if ($idNegocioUsuario === null || $idNegocioProducto === null || $idNegocioProducto !== $idNegocioUsuario) {
+                return $this->respuesta(403, [], ['No tiene permisos sobre este negocio.'], 403);
+            }
+        }
+
+        try {
+            $change_service->add_change_multiple($idCambio, (float) $precioCambio, $nuevos, $idNegocioUsuario);
+            return $this->respuesta(200, ['OK' => 'OK'], []);
+        } catch (\Throwable $th) {
+            return $this->respuesta(400, [], [$th->getMessage()], 400);
+        }
+    }
 }

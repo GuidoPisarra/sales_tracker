@@ -41,7 +41,7 @@ class ReportService
         $ventas = $this->rep_report->report_salesProduct($id_negocio);
         $cambios = $this->rep_change->list_changes($id_negocio);
         $resultado = [];
-        $resultado['cambios'] = $cambios;
+        $resultado['cambios'] = $this->agruparCambios($cambios ?? []);
         $ventasAgrupadas = [];
         foreach ($ventas as $venta) {
             $idVenta = $venta['id'];
@@ -73,6 +73,59 @@ class ReportService
         $jsonResultado = json_encode($resultado);
         return $resultado;
     }
+    /**
+     * Un cambio por varios productos se guarda como varias filas en "cambios" (una por unidad
+     * nueva, misma fecha_cambio y mismo producto devuelto). Acá se juntan en un solo cambio con
+     * el detalle en "productos_nuevos". Los campos de siempre (precio_producto_nuevo,
+     * descripcion_nuevo, ...) quedan con los totales para que las versiones viejas de la app
+     * lo sigan mostrando bien.
+     */
+    private function agruparCambios(array $filas): array
+    {
+        $grupos = [];
+        foreach ($filas as $fila) {
+            $clave = $fila['id_producto_cambio'] . '|' . $fila['fecha_cambio'];
+            if (!isset($grupos[$clave])) {
+                $grupos[$clave] = [
+                    'id_producto_cambio' => $fila['id_producto_cambio'],
+                    'precio_producto_cambio' => 0.0,
+                    'id_producto_nuevo' => $fila['id_producto_nuevo'],
+                    'precio_producto_nuevo' => 0.0,
+                    'id_negocio' => $fila['id_negocio'],
+                    'fecha_cambio' => $fila['fecha_cambio'],
+                    'descripcion_cambio' => $fila['descripcion_cambio'],
+                    'descripcion_nuevo' => '',
+                    'productos_nuevos' => [],
+                ];
+            }
+            $grupo = &$grupos[$clave];
+            $grupo['precio_producto_cambio'] += (float) $fila['precio_producto_cambio'];
+            $grupo['precio_producto_nuevo'] += (float) $fila['precio_producto_nuevo'];
+
+            $claveProducto = $fila['id_producto_nuevo'] . '|' . (float) $fila['precio_producto_nuevo'];
+            if (!isset($grupo['productos_nuevos'][$claveProducto])) {
+                $grupo['productos_nuevos'][$claveProducto] = [
+                    'id' => $fila['id_producto_nuevo'],
+                    'descripcion' => $fila['descripcion_nuevo'],
+                    'precio' => (float) $fila['precio_producto_nuevo'],
+                    'cantidad' => 0,
+                ];
+            }
+            $grupo['productos_nuevos'][$claveProducto]['cantidad']++;
+            unset($grupo);
+        }
+
+        foreach ($grupos as &$grupo) {
+            $grupo['productos_nuevos'] = array_values($grupo['productos_nuevos']);
+            $grupo['descripcion_nuevo'] = implode(' + ', array_map(function ($p) {
+                return $p['cantidad'] > 1 ? $p['cantidad'] . 'x ' . $p['descripcion'] : (string) $p['descripcion'];
+            }, $grupo['productos_nuevos']));
+        }
+        unset($grupo);
+
+        return array_values($grupos);
+    }
+
     public function report_incomes_expenses(int $month, int $year, $id_negocio): ReportIncomesExpensesDTO
     {
         $expenses = $this->rep_report->report_expenses($month, $year, $id_negocio);

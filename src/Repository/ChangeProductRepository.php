@@ -85,6 +85,79 @@ class ChangeProductRepository extends BaseRepository
         }
     }
 
+    /**
+     * Cambio de un producto devuelto por varios productos nuevos, todo en una transacción:
+     * +1 de stock al devuelto, -cantidad a cada nuevo (si alguno no tiene stock suficiente se
+     * revierte todo). Una fila en "cambios" por unidad nueva, todas con la misma fecha_cambio
+     * (así se agrupan al listar) y el precio del devuelto solo en la primera.
+     *
+     * @param array $productosNuevos [ ['id' => int, 'precio' => float, 'cantidad' => int], ... ]
+     */
+    public function realizarCambioMultiple(int $idProductoCambio, float $precioProductoCambio, array $productosNuevos, int $idNegocio): bool
+    {
+        $timezone = new \DateTimeZone('America/Argentina/Buenos_Aires');
+        $fechaCambio = (new \DateTime('now', $timezone))->format('Y-m-d H:i:s');
+
+        // Mismo producto elegido más de una vez: se suma la cantidad para validar el stock.
+        $cantidadPorProducto = [];
+        foreach ($productosNuevos as $nuevo) {
+            $cantidadPorProducto[$nuevo['id']] = ($cantidadPorProducto[$nuevo['id']] ?? 0) + $nuevo['cantidad'];
+        }
+
+        $pdo = $this->get_bbdd();
+        $pdo->beginTransaction();
+        try {
+            $queryChange = $pdo->prepare('INSERT INTO cambios
+                (id_producto_cambio, precio_producto_cambio, id_producto_nuevo, precio_producto_nuevo, id_negocio, fecha_cambio)
+                VALUES (:id_producto_cambio, :precio_producto_cambio, :id_producto_nuevo, :precio_producto_nuevo, :id_negocio, :fecha_cambio)');
+
+            $primera = true;
+            foreach ($productosNuevos as $nuevo) {
+                for ($i = 0; $i < $nuevo['cantidad']; $i++) {
+                    $precioDevuelto = $primera ? $precioProductoCambio : 0;
+                    $queryChange->bindValue(':id_producto_cambio', $idProductoCambio);
+                    $queryChange->bindValue(':precio_producto_cambio', $precioDevuelto);
+                    $queryChange->bindValue(':id_producto_nuevo', $nuevo['id']);
+                    $queryChange->bindValue(':precio_producto_nuevo', $nuevo['precio']);
+                    $queryChange->bindValue(':id_negocio', $idNegocio);
+                    $queryChange->bindValue(':fecha_cambio', $fechaCambio);
+                    if (!$queryChange->execute()) {
+                        throw new \Exception('No se pudo registrar el cambio.');
+                    }
+                    $primera = false;
+                }
+            }
+
+            $queryDevuelto = $pdo->prepare('UPDATE product SET quantity = quantity + 1 WHERE id = :id AND id_negocio = :id_negocio');
+            $queryDevuelto->bindValue(':id', $idProductoCambio);
+            $queryDevuelto->bindValue(':id_negocio', $idNegocio);
+            if (!$queryDevuelto->execute()) {
+                throw new \Exception('No se pudo actualizar el stock del producto devuelto.');
+            }
+
+            $queryNuevo = $pdo->prepare('UPDATE product SET quantity = quantity - :cantidad
+                WHERE id = :id AND id_negocio = :id_negocio AND quantity >= :cantidadMinima');
+            foreach ($cantidadPorProducto as $idNuevo => $cantidad) {
+                $queryNuevo->bindValue(':cantidad', $cantidad, PDO::PARAM_INT);
+                $queryNuevo->bindValue(':cantidadMinima', $cantidad, PDO::PARAM_INT);
+                $queryNuevo->bindValue(':id', $idNuevo);
+                $queryNuevo->bindValue(':id_negocio', $idNegocio);
+                $queryNuevo->execute();
+                if ($queryNuevo->rowCount() === 0) {
+                    throw new \Exception('Uno de los productos nuevos no tiene stock suficiente.');
+                }
+            }
+
+            $pdo->commit();
+            return true;
+        } catch (\Throwable $th) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            throw $th;
+        }
+    }
+
     public function report_changes(int $month, int $year, int $id_negocio): ?float
     {
         $query = $this->get_bbdd()->prepare(' SELECT COALESCE(SUM(c.precio_producto_cambio - c.precio_producto_nuevo), 0) AS precio_diferencia

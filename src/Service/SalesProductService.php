@@ -8,6 +8,9 @@ use App\Repository\SalesProductRepository;
 
 class SalesProductService
 {
+    /** Formas de pago que se pueden asignar al editar una venta ("Cta Cte" queda afuera). */
+    public const FORMAS_PAGO_EDITABLES = ['efectivo', 'tarjeta', 'dni', 'mercadopago'];
+
     protected $rep_salesProduct;
 
     public function __construct(SalesProductRepository $rep_salesProduct)
@@ -33,5 +36,10 @@ class SalesProductService
     public function register_salesProduct(RegisterSalesProductDTO $dto)
     {
         return $this->rep_salesProduct->register_salesProduct($dto);
+    }
+
+    public function cambiarFormaPago(int $idSale, string $typePayment, int $idNegocio): bool
+    {
+        return $this->rep_salesProduct->cambiarFormaPago($idSale, $typePayment, $idNegocio);
     }
 }
