@@ -130,7 +130,7 @@ class SalesProductController extends BaseController
 
     /**
      * Cambia la forma de pago de una venta ya registrada (todas las líneas del mismo id_sale).
-     * Body: { "idSaleProduct": <id_sale>, "typePayment": "efectivo" | "tarjeta" | "dni" }.
+     * Body: { "idSaleProduct": <id_sale>, "typePayment": "efectivo" | "tarjeta" | "dni" | "mercadopago" }.
      * No pasa a ni desde "Cta Cte": eso implica crear/borrar la deuda del cliente en ctacte.
      */
     #[Route('/salesProduct/typePayment', name: 'app_type_payment_salesProduct', methods: ['POST'])]

@@ -9,7 +9,7 @@ use App\Repository\SalesProductRepository;
 class SalesProductService
 {
     /** Formas de pago que se pueden asignar al editar una venta ("Cta Cte" queda afuera). */
-    public const FORMAS_PAGO_EDITABLES = ['efectivo', 'tarjeta', 'dni'];
+    public const FORMAS_PAGO_EDITABLES = ['efectivo', 'tarjeta', 'dni', 'mercadopago'];
 
     protected $rep_salesProduct;
 
