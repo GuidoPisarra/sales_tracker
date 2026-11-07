@@ -48,12 +48,6 @@ services:
         arguments:
             - '%kernel.project_dir%'
             
-    # DTOs
-    App\DTO\Usuario\RegistrarUsuarioDTO:
-        arguments:
-            - '@App\Repository\UsuarioRepository'
-            - '@Symfony\Component\Cache\Adapter\FilesystemAdapter'
-
     App\EventListener\AuthenticationSuccessListener:
         tags:
             - { name: kernel.event_listener, event: lexik_jwt_authentication.on_authentication_success, method: onAuthenticationSuccess }

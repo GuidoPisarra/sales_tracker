@@ -8,20 +8,6 @@ use PDO;
 
 class SalesProductRepository extends BaseRepository
 {
-    public function list_salesProduct(int $id_negocio): ?array
-    {
-        $query = $this->get_bbdd()->prepare('SELECT id id, description description,price price,id_sucursal id_sucursal, date_expense date_expense FROM expense WHERE id_negocio = :id_negocio');
-        $query->bindParam(':id_negocio', $id_negocio);
-        $query->execute();
-        $query->setFetchMode(PDO::FETCH_ASSOC);
-        $salesProduct = $query->fetchAll();
-
-        if (!$salesProduct) {
-            return null;
-        }
-
-        return $salesProduct;
-    }
 
     /**
      * Negocio real dueño de una venta (sales_product), para validar antes de borrarla/registrarla.

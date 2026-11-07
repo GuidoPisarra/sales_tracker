@@ -289,21 +289,4 @@ class ProductsRepository extends BaseRepository
         }
     }
 
-    public function one_product_sin_token(OneProductDTO $dto): array
-    {
-        $query = $this->get_bbdd()->prepare('SELECT description description,sale_price salePrice FROM product WHERE  code = :code AND activo=0 AND id_negocio = :id_negocio');
-
-        $newProduct = $dto->to_array();
-        $query->bindParam(':code', $newProduct["code"]);
-        $query->bindParam(':id_negocio', $newProduct["id_negocio"]);
-
-        $query->execute();
-        $query->setFetchMode(PDO::FETCH_ASSOC);
-        $product = $query->fetch();
-        if (!$product) {
-            return [];
-        }
-
-        return $product;
-    }
 }

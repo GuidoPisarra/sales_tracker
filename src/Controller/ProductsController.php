@@ -329,36 +329,4 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    #[Route('/precio_producto_sin_token/{code}/{id_negocio}', name: 'app_precio_producto_sin_token', methods: ['GET'])]
-    public function one_(ValidatorInterface $validator, ProductsService $products_service, string $code, int $id_negocio): JsonResponse
-    {
-        $dto = new OneProductDTO();
-        $form = $this->createForm(OneProductType::class, $dto);
-        $dto->setCode($code);
-        $dto->setIdNegocio($id_negocio);
-        $errores = $this->obtener_validaciones($validator, $dto);
-        if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
-            return $this->respuesta(400, [], $errores, 400);
-        }
-
-        try {
-            $resultado = $products_service->one_product_sin_token($dto);
-            if ($resultado === []) {
-                //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: Ocurrió un error grabando el producto.');
-                throw new \Exception("Ocurrió un error al buscar el producto o no existe en el sistema.");
-            }
-            $respuesta = [
-                'OK' => 'OK',
-                'product' => $resultado
-            ];
-            return $this->respuesta(200, $respuesta, []);
-        } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: ' . $th->getMessage());
-            return $this->respuesta(400, [], [$th->getMessage()], 400);
-        }
-
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
-        return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
-    }
 }

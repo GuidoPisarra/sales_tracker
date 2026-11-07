@@ -30,6 +30,4 @@ security:
     # Note: Only the *first* access control that matches will be used
     access_control:
         - { path: ^/api/usuario/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
-        - { path: ^/api/usuario/registrar_usuario, roles: IS_AUTHENTICATED_ANONYMOUSLY }
-        - { path: ^/api/products/precio_producto_sin_token, roles: IS_AUTHENTICATED_ANONYMOUSLY }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }

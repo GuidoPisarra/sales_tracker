@@ -19,21 +19,6 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class SalesProductController extends BaseController
 {
 
-    #[Route('/salesProduct', name: 'app_salesProduct_list', methods: ['GET'])]
-    public function salesProduct_list(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
-    {
-        try {
-            // Siempre el negocio del usuario autenticado: esta ruta no recibe id_negocio por URL.
-            $list_salesProduct = $salesProduct_service->list_salesProduct($this->idNegocioUsuarioActual());
-            return $this->respuesta(200, $list_salesProduct, []);
-        } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
-            return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
-        }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
-        return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
-    }
-
     #[Route('/salesProduct', name: 'app_add_salesProduct', methods: ['POST'])]
     public function salesProduct_add(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {
