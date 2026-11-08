@@ -35,3 +35,4 @@ php_errors.log
 /phpunit.xml
 ###< symfony/phpunit-bridge ###
 /bin/.phpunit/
+/scripts/backup.conf

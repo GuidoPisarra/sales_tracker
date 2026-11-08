@@ -185,6 +185,19 @@ class SuscripcionTest extends KontiaTestCase
         $this->assertFalse(MercadoPagoClient::firmaValida("ts=$viejo,v1=$v1", 'r1', 'abc123', 's'), 'Aviso viejo (replay)');
     }
 
+    public function testAccionSensibleQuedaAuditada(): void
+    {
+        $this->crearNegocio(1);
+        $this->crearUsuario('a@test.com', 1);
+        $this->insertar("INSERT INTO product (description, sale_price, code, activo, id_negocio, sucursal) VALUES ('P', 100, 'P1', 0, 1, 1)");
+        [$codigo] = $this->pedir('GET', '/api/products/products/price_percent/10/0', null, $this->tokenPara('a@test.com'));
+        $this->assertSame(200, $codigo);
+        $fila = $this->pdo()->query("SELECT * FROM auditoria WHERE accion = 'aumento_precios_masivo'")->fetch(\PDO::FETCH_ASSOC);
+        $this->assertNotFalse($fila);
+        $this->assertSame(1, (int) $fila['id_negocio']);
+        $this->assertStringContainsString('"percentage":"10"', $fila['detalle']);
+    }
+
     public function testPlanesPublicosSinLogin(): void
     {
         [$codigo, $json] = $this->pedir('GET', '/api/planes');
