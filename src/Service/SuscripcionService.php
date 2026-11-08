@@ -54,6 +54,9 @@ class SuscripcionService
 
     public function soloLectura(int $idNegocio): bool
     {
+        if ($this->exento($idNegocio)) {
+            return false;
+        }
         return in_array($this->estadoEfectivo($this->repo->porNegocio($idNegocio)), ['prueba_vencida', 'suspendida', 'cancelada'], true);
     }
 
@@ -64,7 +67,7 @@ class SuscripcionService
     {
         $s = $this->repo->porNegocio($idNegocio);
         $plan = $this->planes->obtenerPorNegocio($idNegocio);
-        $estado = $this->estadoEfectivo($s);
+        $estado = !empty($s['exento_limites']) ? 'activa' : $this->estadoEfectivo($s);
         $diasPrueba = null;
         if ($s && $s['estado'] === 'prueba' && $s['prueba_hasta']) {
             $diasPrueba = max(0, (int) ceil((strtotime($s['prueba_hasta']) - time()) / 86400));
@@ -76,6 +79,7 @@ class SuscripcionService
             'prueba_hasta' => $s['prueba_hasta'] ?? null,
             'dias_restantes_prueba' => $diasPrueba,
             'periodo_hasta' => $s['periodo_hasta'] ?? null,
+            'sin_limites' => !empty($s['exento_limites']),
             'con_debito_automatico' => !empty($s['mp_preapproval_id']) && ($s['estado'] ?? '') !== 'cancelada',
         ];
         if ($conUso) {
@@ -116,6 +120,9 @@ class SuscripcionService
         if (!in_array($recurso, self::RECURSOS, true)) {
             throw new \InvalidArgumentException('Recurso desconocido: ' . $recurso);
         }
+        if ($this->exento($idNegocio)) {
+            return null;
+        }
         $plan = $this->planes->obtenerPorNegocio($idNegocio);
         if (!$plan || !array_key_exists('max_' . $recurso, $plan)) {
             return null; // Sin datos del plan: no se limita.
@@ -140,8 +147,20 @@ class SuscripcionService
         return sprintf('Llegaste al límite de tu plan %s (%d %s). Mejorá tu plan para agregar más.', $plan['nombre'], (int) $max, $nombres[$recurso]);
     }
 
+    /**
+     * Clientes anteriores al SaaS: sin límites ni bloqueos (ver migración 0002).
+     */
+    public function exento(int $idNegocio): bool
+    {
+        $s = $this->repo->porNegocio($idNegocio);
+        return $s !== null && !empty($s['exento_limites']);
+    }
+
     public function incluyeCuentasCorrientes(int $idNegocio): bool
     {
+        if ($this->exento($idNegocio)) {
+            return true;
+        }
         $plan = $this->planes->obtenerPorNegocio($idNegocio);
         return !$plan || !array_key_exists('cuentas_corrientes', $plan) || (bool) $plan['cuentas_corrientes'];
     }

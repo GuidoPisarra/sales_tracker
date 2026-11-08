@@ -46,6 +46,16 @@ class SuscripcionRepository extends BaseRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    public function emailTitular(int $idNegocio): ?string
+    {
+        $stmt = $this->get_bbdd()->prepare(
+            "SELECT email FROM user WHERE id_negocio = :n AND role LIKE '%ROLE_TITULAR%' AND (eliminado = 0 OR eliminado IS NULL) ORDER BY id LIMIT 1"
+        );
+        $stmt->execute([':n' => $idNegocio]);
+        $email = $stmt->fetchColumn();
+        return $email === false ? null : $email;
+    }
+
     public function marcarAvisoPrueba(int $idNegocio): void
     {
         $this->get_bbdd()->prepare('UPDATE suscripcion SET aviso_prueba_enviado = 1 WHERE id_negocio = :n')->execute([':n' => $idNegocio]);
@@ -53,7 +63,7 @@ class SuscripcionRepository extends BaseRepository
 
     public function actualizar(int $idNegocio, array $campos): void
     {
-        $permitidos = ['id_plan', 'estado', 'prueba_hasta', 'periodo_hasta', 'en_mora_desde', 'cancelada_en', 'mp_preapproval_id', 'id_plan_pendiente'];
+        $permitidos = ['id_plan', 'estado', 'prueba_hasta', 'periodo_hasta', 'en_mora_desde', 'cancelada_en', 'mp_preapproval_id', 'id_plan_pendiente', 'exento_limites'];
         $sets = [];
         $params = [':n' => $idNegocio];
         foreach ($campos as $campo => $valor) {

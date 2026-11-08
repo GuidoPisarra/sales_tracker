@@ -50,18 +50,21 @@ CREATE TABLE IF NOT EXISTS suscripcion (
     mp_preapproval_id VARCHAR(64) NULL,
     id_plan_pendiente INT NULL,
     aviso_prueba_enviado TINYINT(1) NOT NULL DEFAULT 0,
+    -- 1 = cliente anterior al SaaS: no se le aplican límites ni bloqueos
+    -- hasta que pase a un plan pago (se pone en 0 al activar el débito).
+    exento_limites TINYINT(1) NOT NULL DEFAULT 0,
     creada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     actualizada_en DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     UNIQUE KEY uniq_suscripcion_negocio (id_negocio),
     KEY idx_suscripcion_preapproval (mp_preapproval_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Los negocios que ya existen quedan activos, sin vencimiento, con el plan que
--- tenían (o Fundador si no tenían ninguno). Nadie pierde acceso.
-INSERT INTO suscripcion (id_negocio, id_plan, estado)
+-- Los negocios que ya existen quedan activos, sin vencimiento y sin límites,
+-- con el plan que tenían (o Fundador si no tenían ninguno). Nadie pierde acceso.
+INSERT INTO suscripcion (id_negocio, id_plan, estado, exento_limites)
 SELECT n.id_negocio,
        COALESCE(MAX(n.id_plan), (SELECT id FROM plan_suscripcion WHERE codigo = 'fundador' LIMIT 1)),
-       'activa'
+       'activa', 1
 FROM negocio n
 WHERE NOT EXISTS (SELECT 1 FROM suscripcion s WHERE s.id_negocio = n.id_negocio)
 GROUP BY n.id_negocio;
