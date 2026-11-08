@@ -10,6 +10,8 @@ use App\Service\NotificacionesService;
 use App\Service\PlanService;
 use App\Service\PreciosService;
 use App\Service\ServicioUsuario;
+use App\Service\SuscripcionService;
+use App\Service\AuditoriaService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class AuthenticationSuccessListener
@@ -22,8 +24,10 @@ class AuthenticationSuccessListener
     private $notificacionesService;
     private $planService;
     private $preciosService;
+    private $suscripcionService;
+    private $auditoria;
 
-    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service, PlanService $plan_service, PreciosService $precios_service)
+    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service, PlanService $plan_service, PreciosService $precios_service, SuscripcionService $suscripcion_service, AuditoriaService $auditoria)
     {
         $this->requestStack = $requestStack;
         $this->servicioUsuario = $servicio_usuario;
@@ -31,6 +35,8 @@ class AuthenticationSuccessListener
         $this->notificacionesService = $notificaciones_service;
         $this->planService = $plan_service;
         $this->preciosService = $precios_service;
+        $this->suscripcionService = $suscripcion_service;
+        $this->auditoria = $auditoria;
     }
     public function onAuthenticationSuccess(AuthenticationSuccessEvent $event)
     {
@@ -65,6 +71,12 @@ class AuthenticationSuccessListener
             ? $this->intentar('contar precios desactualizados', fn () => $this->preciosService->contarPreciosDesactualizados((int) $datos_usuario['id_negocio']))
             : null;
 
+        $suscripcion = $this->intentar('obtener suscripción', fn () => $this->suscripcionService->resumen((int) $datos_usuario['id_negocio']));
+
+        if ($request && str_ends_with($request->getPathInfo(), '/login')) {
+            $this->auditoria->registrar('login', ['via' => 'clave'], (int) $datos_usuario['id_negocio'], (int) $datos_usuario['id']);
+        }
+
         $data = [
             'token' => $data['token'],
             'id' => $datos_usuario['id'],
@@ -74,6 +86,7 @@ class AuthenticationSuccessListener
             'nombre' => $datos_usuario['name'],
             'notificaciones' => $notificaciones,
             'plan' => $plan,
+            'suscripcion' => $suscripcion,
             'asistente_ia' => (bool) $datos_usuario['asistente_ia'],
             'precios_desactualizados' => $preciosDesactualizados
         ];

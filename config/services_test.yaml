@@ -1,0 +1,10 @@
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    # Los tests reemplazan estos servicios por versiones falsas (sin llamar a Google ni a Mercado Pago).
+    App\Service\GoogleAuthService:
+        public: true
+    App\Service\MercadoPagoClient:
+        public: true
