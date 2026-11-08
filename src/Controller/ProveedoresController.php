@@ -13,9 +13,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 #[Route('/api/proveedores')]
 class ProveedoresController extends BaseController
 {
-    #[Route('/proveedores_list/{id_local}', name: 'app_proveedores_list', methods: ['GET'])]
-    public function list_proveedores(Request $request, ValidatorInterface $validator, ProveedoresService $proveedores_service, int $id_local): JsonResponse
+    #[Route('/proveedores_list', name: 'app_proveedores_list_token', defaults: ['id_local' => null], methods: ['GET'])]
+    #[Route('/proveedores_list/{id_local}', name: 'app_proveedores_list', requirements: ['id_local' => '\d+'], methods: ['GET'])]
+    public function list_proveedores(Request $request, ValidatorInterface $validator, ProveedoresService $proveedores_service, ?int $id_local): JsonResponse
     {
+        $id_local ??= $this->idNegocioUsuarioActual();
         // id_local es en realidad el id_negocio (ver ProveedoresRepository::list_proveedores).
         if ($check = $this->negocioPermitido($id_local)) {
             return $check;

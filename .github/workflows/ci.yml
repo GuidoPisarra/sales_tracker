@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  push:
+    branches: [main, mejoras-back]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: kontia_test
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, intl, mbstring
+          coverage: none
+      - name: Instalar dependencias
+        run: composer install --no-interaction --no-progress --no-scripts
+      - name: Claves JWT de prueba
+        run: |
+          mkdir -p config/jwt
+          openssl genpkey -algorithm RSA -out config/jwt/private.pem -aes256 -pass pass:test -pkeyopt rsa_keygen_bits:2048
+          openssl pkey -in config/jwt/private.pem -passin pass:test -pubout -out config/jwt/public.pem
+      - name: Sintaxis PHP
+        run: find src tests -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+      - name: Tests
+        run: php bin/phpunit

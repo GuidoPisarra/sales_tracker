@@ -19,9 +19,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class NegocioController extends BaseController
 {
 
-    #[Route('/obtener_negocios/{id}', name: 'app_obtener_negocios', methods: ['GET'])]
-    public function obtener_negocios(Request $request, ServicioNegocio $servicio_negocio, int $id): JsonResponse
+    #[Route('/obtener_negocios', name: 'app_obtener_negocios_token', defaults: ['id' => null], methods: ['GET'])]
+    #[Route('/obtener_negocios/{id}', name: 'app_obtener_negocios', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function obtener_negocios(Request $request, ServicioNegocio $servicio_negocio, ?int $id): JsonResponse
     {
+        $id ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id)) {
             return $check;
         }

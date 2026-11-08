@@ -23,9 +23,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class ProductsController extends BaseController
 {
 
-    #[Route('/products_list/{id_local}', name: 'app_products_list', methods: ['GET'])]
-    public function list_products(Request $request, ValidatorInterface $validator, ProductsService $products_service, int $id_local): JsonResponse
+    #[Route('/products_list', name: 'app_products_list_token', defaults: ['id_local' => null], methods: ['GET'])]
+    #[Route('/products_list/{id_local}', name: 'app_products_list', requirements: ['id_local' => '\d+'], methods: ['GET'])]
+    public function list_products(Request $request, ValidatorInterface $validator, ProductsService $products_service, ?int $id_local): JsonResponse
     {
+        $id_local ??= $this->idNegocioUsuarioActual();
         // id_local es en realidad el id_negocio (ver ProductsRepository::list_products).
         if ($check = $this->negocioPermitido($id_local)) {
             return $check;
@@ -109,10 +111,15 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    #[Route('/products_one/{code}/{id_negocio}/{sucursal}', name: 'app_products_get_one', methods: ['GET'])]
-    public function one_product(ValidatorInterface $validator, ProductsService $products_service, string $code, int $id_negocio, int $sucursal): JsonResponse
+    #[Route('/products_one/{code}/{sucursal}', name: 'app_products_get_one_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/products_one/{code}/{id_negocio}/{sucursal}', name: 'app_products_get_one', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function one_product(ValidatorInterface $validator, ProductsService $products_service, string $code, ?int $id_negocio, int $sucursal): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
+            return $check;
+        }
+        if ($check = $this->sucursalPermitida($sucursal)) {
             return $check;
         }
 
@@ -143,9 +150,11 @@ class ProductsController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    #[Route('/products/price_percent/{percentage}/{id_negocio}/{proveedor}', name: 'app_products_price_percent', methods: ['GET'])]
-    public function percentage_price_product(ValidatorInterface $validator, ProductsService $products_service, $percentage, $id_negocio, $proveedor): JsonResponse
+    #[Route('/products/price_percent/{percentage}/{proveedor}', name: 'app_products_price_percent_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/products/price_percent/{percentage}/{id_negocio}/{proveedor}', name: 'app_products_price_percent', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function percentage_price_product(ValidatorInterface $validator, ProductsService $products_service, $percentage, ?int $id_negocio, $proveedor): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->soloTitular()) {
             return $check;
         }
@@ -224,6 +233,12 @@ class ProductsController extends BaseController
             $idNegocioReal = $product_service->obtenerIdNegocio((int) $producto['id']);
             if ($idNegocioReal === null || $idNegocioReal !== $idNegocioUsuario) {
                 return $this->respuesta(403, [], ['No tiene permisos sobre este negocio.'], 403);
+            }
+
+            // Origen y destino tienen que ser sucursales del mismo negocio.
+            if (($check = $this->sucursalPermitida($producto['sucursal'] ?? null))
+                || ($check = $this->sucursalPermitida($producto['sucursal_nueva'] ?? null))) {
+                return $check;
             }
 
             $dto = new TrasladoProductDTO();

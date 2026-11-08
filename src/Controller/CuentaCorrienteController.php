@@ -20,9 +20,11 @@ class CuentaCorrienteController extends BaseController
 {
 
 
-    #[Route('/obtener_cuentas_corrientes/{id_negocio}', name: 'app_obtener_cuentas_corrientes', methods: ['GET'])]
-    public function cuentas_list(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, int $id_negocio): JsonResponse
+    #[Route('/obtener_cuentas_corrientes', name: 'app_obtener_cuentas_corrientes_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/obtener_cuentas_corrientes/{id_negocio}', name: 'app_obtener_cuentas_corrientes', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function cuentas_list(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }
@@ -37,9 +39,11 @@ class CuentaCorrienteController extends BaseController
     }
 
 
-    #[Route('/obtener_cuentas_corrientes_con_deuda/{id_negocio}', name: 'app_obtener_cuentas_corrientes_con_deuda', methods: ['GET'])]
-    public function cuentass_list_con_deuda(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, int $id_negocio): JsonResponse
+    #[Route('/obtener_cuentas_corrientes_con_deuda', name: 'app_obtener_cuentas_corrientes_con_deuda_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/obtener_cuentas_corrientes_con_deuda/{id_negocio}', name: 'app_obtener_cuentas_corrientes_con_deuda', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function cuentass_list_con_deuda(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }

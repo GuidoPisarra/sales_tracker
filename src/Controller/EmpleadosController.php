@@ -19,9 +19,11 @@ class EmpleadosController extends BaseController
     $this->empleadosService = $empleadosService;
   }
 
-  #[Route('/{id_negocio}', name: 'app_empleados_list', methods: ['GET'])]
-  public function listar(int $id_negocio): JsonResponse
+  #[Route('', name: 'app_empleados_list_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+  #[Route('/{id_negocio}', name: 'app_empleados_list', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+  public function listar(?int $id_negocio): JsonResponse
   {
+      $id_negocio ??= $this->idNegocioUsuarioActual();
     if ($check = $this->soloTitular()) {
       return $check;
     }

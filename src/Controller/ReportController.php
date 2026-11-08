@@ -12,9 +12,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class ReportController extends BaseController
 {
 
-    #[Route('/salesProduct/{id_negocio}', name: 'app_salesProduct_report', methods: ['GET'])]
-    public function salesProduct_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $id_negocio): JsonResponse
+    #[Route('/salesProduct', name: 'app_salesProduct_report_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/salesProduct/{id_negocio}', name: 'app_salesProduct_report', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function salesProduct_report(Request $request, ValidatorInterface $validator, ReportService $report_service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }
@@ -28,9 +30,11 @@ class ReportController extends BaseController
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
-    #[Route('/salesProduct/recientes/{id_negocio}', name: 'app_salesProduct_recientes', methods: ['GET'])]
-    public function salesProduct_recientes(Request $request, ReportService $report_service, int $id_negocio): JsonResponse
+    #[Route('/salesProduct/recientes', name: 'app_salesProduct_recientes_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/salesProduct/recientes/{id_negocio}', name: 'app_salesProduct_recientes', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function salesProduct_recientes(Request $request, ReportService $report_service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }
@@ -45,9 +49,11 @@ class ReportController extends BaseController
         }
     }
 
-    #[Route('/incomesExpenses/{month}/{year}/{id_negocio}', name: 'app_incomes_expenses', methods: ['GET'])]
-    public function incomes_expenses_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $month, int $year, int $id_negocio): JsonResponse
+    #[Route('/incomesExpenses/{month}/{year}', name: 'app_incomes_expenses_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/incomesExpenses/{month}/{year}/{id_negocio}', name: 'app_incomes_expenses', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function incomes_expenses_report(Request $request, ValidatorInterface $validator, ReportService $report_service, int $month, int $year, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->soloTitular()) {
             return $check;
         }

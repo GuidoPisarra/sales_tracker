@@ -36,6 +36,9 @@ class SalesProductController extends BaseController
         $fechaFormateada = $fechaArgentina->format('Y-m-d H:i:s');
         $idNegocioUsuario = $this->idNegocioUsuarioActual();
         foreach ($datos as $venta) {
+            if ($check = $this->sucursalPermitida($venta['sucursal'] ?? null)) {
+                return $check;
+            }
             $dto = new AddSalesProductDTO();
             $dto->setIdProduct($venta['id']);
             $dto->setSaleDay($fechaFormateada);
@@ -45,7 +48,8 @@ class SalesProductController extends BaseController
             // El id_negocio nunca se toma del body: siempre el del usuario autenticado.
             $dto->setIdNegocio((string) $idNegocioUsuario);
             $dto->setSucursal($venta['sucursal']);
-            $dto->setUsuario($venta['usuario']);
+            // Quién vendió sale del token, no del body.
+            $dto->setUsuario($this->idUsuarioActual());
             $this->createForm(AddSalesProductType::class, $dto);
             $errores = $this->obtener_validaciones($validator, $dto);
             if (count($errores) > 0) {

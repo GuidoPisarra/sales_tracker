@@ -13,9 +13,11 @@ class AvisosController extends BaseController
      * Avisos del dashboard. El front ya llamaba a esta ruta y, como no existía,
      * el error se ignoraba en silencio.
      */
-    #[Route('/{id_negocio}', name: 'app_avisos_dashboard', methods: ['GET'])]
-    public function listar(int $id_negocio, AvisosService $avisos_service): JsonResponse
+    #[Route('', name: 'app_avisos_dashboard_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/{id_negocio}', name: 'app_avisos_dashboard', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function listar(?int $id_negocio, AvisosService $avisos_service): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }

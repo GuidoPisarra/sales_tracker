@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Model\Usuario;
 use App\Service\AppLogs;
+use App\Tenant\TenantContext;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -11,6 +12,30 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class BaseController extends AbstractController
 {
+    public static function getSubscribedServices(): array
+    {
+        return array_merge(parent::getSubscribedServices(), [
+            TenantContext::class => TenantContext::class,
+        ]);
+    }
+
+    protected function tenant(): TenantContext
+    {
+        return $this->container->get(TenantContext::class);
+    }
+
+    /**
+     * Verifica que la sucursal pedida (número de sucursal) sea del negocio del usuario.
+     * Devuelve null si está autorizado; si no, una JsonResponse 403 para retornar.
+     */
+    protected function sucursalPermitida($sucursal): ?JsonResponse
+    {
+        if ($this->tenant()->sucursalPermitida($sucursal)) {
+            return null;
+        }
+        return $this->respuesta(403, [], ['No tiene permisos sobre esta sucursal.'], 403);
+    }
+
     /**
      * Devuelve el id_negocio del usuario autenticado por JWT (nunca el que mande el cliente).
      */

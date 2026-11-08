@@ -15,9 +15,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class ExpensesController extends BaseController
 {
 
-    #[Route('/expenses/{id_negocio}', name: 'app_expenses_list', methods: ['GET'])]
-    public function expenses_list(Request $request, ValidatorInterface $validator, ExpenseService $expense_service, int $id_negocio): JsonResponse
+    #[Route('/expenses', name: 'app_expenses_list_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/expenses/{id_negocio}', name: 'app_expenses_list', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function expenses_list(Request $request, ValidatorInterface $validator, ExpenseService $expense_service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }
