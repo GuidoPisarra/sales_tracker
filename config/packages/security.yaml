@@ -1,10 +1,8 @@
 security:
     enable_authenticator_manager: true
-    # https://symfony.com/doc/current/security.html#registering-the-user-hashing-passwords
     password_hashers:
         App\Model\Usuario:
             id: 'App\Security\CustomPasswordHasher'
-    # https://symfony.com/doc/current/security.html#loading-the-user-the-user-provider
     providers:
         usuarios:
             id: App\Security\UsuariosProvider
@@ -15,19 +13,27 @@ security:
         login:
             pattern: ^/api/usuario/login
             stateless: true
+            provider: usuarios
+            user_checker: App\Security\UserChecker
             json_login:
-                check_path: /api/usuario/login 
+                check_path: /api/usuario/login
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
+            # Máximo 5 intentos fallidos por minuto por usuario e IP.
+            login_throttling:
+                max_attempts: 5
+                interval: '1 minute'
         api:
-            pattern:   ^/api
+            pattern: ^/api
             provider: usuarios
             stateless: true
-            guard:
-                authenticators:
-                    - lexik_jwt_authentication.jwt_token_authenticator
-    # Easy way to control access for large sections of your site
-    # Note: Only the *first* access control that matches will be used
+            user_checker: App\Security\UserChecker
+            jwt: ~
+    # Solo se usa la primera regla que coincide.
     access_control:
-        - { path: ^/api/usuario/login, roles: IS_AUTHENTICATED_ANONYMOUSLY }
+        - { path: ^/api/usuario/login, roles: PUBLIC_ACCESS }
+        - { path: ^/api/registro, roles: PUBLIC_ACCESS }
+        - { path: ^/api/usuario/(google|olvide-clave|restablecer-clave), roles: PUBLIC_ACCESS }
+        - { path: ^/api/planes$, roles: PUBLIC_ACCESS }
+        - { path: ^/api/webhooks, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
