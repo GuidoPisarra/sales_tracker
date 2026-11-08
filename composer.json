@@ -48,18 +48,25 @@
         }
     },
     "autoload": {
-        "psr-4": { "App\\": "src/" }
+        "psr-4": {
+            "App\\": "src/"
+        }
     },
     "autoload-dev": {
-        "psr-4": { "App\\Tests\\": "tests/" }
+        "psr-4": {
+            "App\\Tests\\": "tests/"
+        }
     },
     "scripts": {
-        "auto-scripts": {
-            "cache:clear": "symfony-cmd",
-            "assets:install %PUBLIC_DIR%": "symfony-cmd"
-        },
-        "post-install-cmd": ["@auto-scripts"],
-        "post-update-cmd": ["@auto-scripts"],
+        "auto-scripts": [
+            "php bin/console cache:clear"
+        ],
+        "post-install-cmd": [
+            "@auto-scripts"
+        ],
+        "post-update-cmd": [
+            "@auto-scripts"
+        ],
         "test": "phpunit"
     },
     "conflict": {
