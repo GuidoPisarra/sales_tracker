@@ -21,6 +21,11 @@ class ReportService
         $this->rep_change = $rep_change;
     }
 
+    public function resumenVentas(int $id_negocio, string $desde, string $hasta): array
+    {
+        return $this->rep_report->resumenVentas($id_negocio, $desde, $hasta);
+    }
+
     public function report_salesProduct_recientes(int $id_negocio, int $dias)
     {
         $dias = $dias > 0 ? $dias : 15;
@@ -36,10 +41,10 @@ class ReportService
         }, $filas);
     }
 
-    public function report_salesProduct(int $id_negocio)
+    public function report_salesProduct(int $id_negocio, ?string $desde = null, ?string $hasta = null)
     {
-        $ventas = $this->rep_report->report_salesProduct($id_negocio);
-        $cambios = $this->rep_change->list_changes($id_negocio);
+        $ventas = $this->rep_report->report_salesProduct($id_negocio, $desde, $hasta);
+        $cambios = $this->rep_change->list_changes($id_negocio, $desde, $hasta);
         $resultado = [];
         $resultado['cambios'] = $this->agruparCambios($cambios ?? []);
         $ventasAgrupadas = [];
@@ -69,8 +74,6 @@ class ReportService
 
         // Ahora $resultado contiene la estructura deseada con las ventas agrupadas en una lista
 
-        // Convierte $resultado a JSON si es necesario
-        $jsonResultado = json_encode($resultado);
         return $resultado;
     }
     /**

@@ -25,6 +25,8 @@ class AuditoriaListener implements EventSubscriberInterface
         'app_empleado_crear' => 'alta_empleado',
         'app_empleado_actualizar' => 'cambio_empleado',
         'app_delete_employee' => 'baja_empleado',
+        'app_products_masivo' => 'edicion_masiva_productos',
+        'app_products_importar' => 'importacion_productos',
         'app_add_negocio' => 'alta_sucursal',
         'app_delete_negocio' => 'baja_sucursal',
     ];

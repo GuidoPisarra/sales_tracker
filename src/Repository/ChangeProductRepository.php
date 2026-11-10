@@ -8,16 +8,21 @@ use PDO;
 class ChangeProductRepository extends BaseRepository
 {
 
-    public function list_changes(int $id_negocio): ?array
+    public function list_changes(int $id_negocio, ?string $desde = null, ?string $hasta = null): ?array
     {
         $idNegocio = $id_negocio;
+        $rango = $desde !== null && $hasta !== null ? ' AND c.fecha_cambio >= :desde AND c.fecha_cambio < :hasta' : '';
         $query = $this->get_bbdd()->prepare('SELECT c.id_producto_cambio, c.precio_producto_cambio, c.id_producto_nuevo, c.precio_producto_nuevo, c.id_negocio, 
                 c.fecha_cambio, p.description descripcion_nuevo, pr.description descripcion_cambio
         FROM cambios c
         LEFT JOIN product p ON p.id =  c.id_producto_nuevo
 		LEFT JOIN product pr ON pr.id =  c.id_producto_cambio
-        WHERE c.id_negocio = :id_negocio');
+        WHERE c.id_negocio = :id_negocio' . $rango);
         $query->bindParam(':id_negocio', $idNegocio);
+        if ($rango !== '') {
+            $query->bindValue(':desde', $desde);
+            $query->bindValue(':hasta', $hasta);
+        }
         $query->execute();
         $query->setFetchMode(PDO::FETCH_ASSOC);
         $changes = $query->fetchAll();

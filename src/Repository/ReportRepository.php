@@ -6,19 +6,28 @@ use PDO;
 
 class ReportRepository extends BaseRepository
 {
-    public function report_salesProduct(int $id_negocio): ?array
+    /**
+     * Ventas del negocio. Con $desde/$hasta (Y-m-d H:i:s) solo las de ese rango; sin
+     * rango, todas (así lo piden las versiones viejas de la app).
+     */
+    public function report_salesProduct(int $id_negocio, ?string $desde = null, ?string $hasta = null)
     {
-        $negocio = $id_negocio;
+        $rango = '';
+        $params = [':id_negocio' => $id_negocio];
+        if ($desde !== null && $hasta !== null) {
+            $rango = ' AND sp.sale_product_date >= :desde AND sp.sale_product_date < :hasta';
+            $params[':desde'] = $desde;
+            $params[':hasta'] = $hasta;
+        }
         $query = $this->get_bbdd()->prepare('SELECT s.id, sp.id_product, sp.id_sale, p.description, sp.quantity, (sp.quantity * sp.price) as amount,sp.sale_product_date, sp.type_payment 
             FROM sales_product sp
             JOIN sales s 
             ON s.id = sp.id_sale
             JOIN  product p 
             ON p.id = sp.id_product 
-            WHERE sp.active = 0 AND sp.id_negocio = :id_negocio
+            WHERE sp.active = 0 AND sp.id_negocio = :id_negocio' . $rango . '
             ORDER BY sp.sale_product_date ASC');
-        $query->bindParam(':id_negocio', $negocio);
-        $query->execute();
+        $query->execute($params);
         $query->setFetchMode(PDO::FETCH_ASSOC);
 
         $salesProduct = $query->fetchAll();
@@ -28,6 +37,25 @@ class ReportRepository extends BaseRepository
         }
 
         return $salesProduct;
+    }
+
+    /**
+     * Totales del día para el Inicio: monto vendido, cantidad de ventas y por medio de pago.
+     */
+    public function resumenVentas(int $id_negocio, string $desde, string $hasta): array
+    {
+        $query = $this->get_bbdd()->prepare('SELECT COALESCE(SUM(sp.price * sp.quantity), 0) AS total,
+                COUNT(DISTINCT sp.id_sale) AS ventas, COALESCE(SUM(sp.quantity), 0) AS unidades
+            FROM sales_product sp
+            WHERE sp.active = 0 AND sp.id_negocio = :n AND sp.sale_product_date >= :desde AND sp.sale_product_date < :hasta');
+        $query->execute([':n' => $id_negocio, ':desde' => $desde, ':hasta' => $hasta]);
+        $fila = $query->fetch(PDO::FETCH_ASSOC) ?: [];
+
+        return [
+            'total' => (float) ($fila['total'] ?? 0),
+            'ventas' => (int) ($fila['ventas'] ?? 0),
+            'unidades' => (int) ($fila['unidades'] ?? 0),
+        ];
     }
 
     /**

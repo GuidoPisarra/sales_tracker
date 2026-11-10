@@ -40,6 +40,20 @@ class ProductsRepository extends BaseRepository
         return (int) $query->fetchColumn();
     }
 
+    public function contarStockBajo(int $id_negocio): int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT COUNT(*) FROM product WHERE id_negocio = :id_negocio AND activo = 0 AND quantity > 0 AND quantity <= ' . self::STOCK_BAJO);
+        $query->execute([':id_negocio' => $id_negocio]);
+        return (int) $query->fetchColumn();
+    }
+
+    public function contarActivos(int $id_negocio): int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT COUNT(*) FROM product WHERE id_negocio = :id_negocio AND activo = 0');
+        $query->execute([':id_negocio' => $id_negocio]);
+        return (int) $query->fetchColumn();
+    }
+
     public function list_products(int $id_local): ?array
     {
         $query = $this->get_bbdd()->prepare('SELECT p.id AS id, n.sucursal AS sucursal, n.nombre AS nombreSucursal, p.description AS description,
@@ -301,4 +315,304 @@ class ProductsRepository extends BaseRepository
         }
     }
 
+    /** Columnas que devuelve la búsqueda paginada: las mismas que list_products. */
+    private const COLUMNAS_LISTA = 'p.id AS id, n.sucursal AS sucursal, n.nombre AS nombreSucursal, p.description AS description,
+            p.cost_price AS cost_price, p.sale_price AS sale_price, p.quantity AS quantity,
+            p.id_proveedor AS id_proveedor, p.code AS code, p.size AS size, p.activo AS activo, p.codigo_interno AS codigoInterno,
+            p.fecha_actualizado AS fechaActualizado, p.barcode AS barcode';
+
+    /** Stock a partir del cual un producto deja de contar como "stock bajo". */
+    public const STOCK_BAJO = 3;
+
+    /**
+     * Búsqueda paginada de productos activos del negocio.
+     *
+     * Cada palabra de $texto tiene que aparecer en el nombre, el código, el código
+     * interno o el código de barras (en cualquier orden). La comparación no distingue
+     * mayúsculas ni tildes porque la usa la collation de la tabla (utf8mb4 *_ci).
+     *
+     * @return array{items: array, total: int}
+     */
+    public function buscar(int $idNegocio, string $texto, ?int $proveedor, ?string $filtro, ?int $sucursal, int $limite, int $desde): array
+    {
+        $where = ['p.activo = 0', 'p.id_negocio = :id_negocio'];
+        $params = [':id_negocio' => $idNegocio];
+
+        $palabras = array_slice(array_values(array_filter(preg_split('/\s+/', trim($texto)) ?: [], fn ($p) => $p !== '')), 0, 6);
+        foreach ($palabras as $i => $palabra) {
+            $like = '%' . addcslashes($palabra, '%_\\') . '%';
+            $where[] = "(p.description LIKE :q{$i} OR p.code LIKE :q{$i}b OR p.codigo_interno LIKE :q{$i}c OR p.barcode LIKE :q{$i}d)";
+            $params[":q{$i}"] = $like;
+            $params[":q{$i}b"] = $like;
+            $params[":q{$i}c"] = $like;
+            $params[":q{$i}d"] = $like;
+        }
+        if ($proveedor !== null && $proveedor > 0) {
+            $where[] = 'p.id_proveedor = :proveedor';
+            $params[':proveedor'] = $proveedor;
+        }
+        if ($sucursal !== null && $sucursal > 0) {
+            $where[] = 'p.sucursal = :sucursal';
+            $params[':sucursal'] = $sucursal;
+        }
+        if ($filtro === 'sin_stock') {
+            $where[] = 'p.quantity <= 0';
+        } elseif ($filtro === 'stock_bajo') {
+            $where[] = 'p.quantity > 0 AND p.quantity <= ' . self::STOCK_BAJO;
+        }
+        $condicion = implode(' AND ', $where);
+        $from = 'FROM product p INNER JOIN negocio n ON n.id_negocio = p.id_negocio AND n.sucursal = p.sucursal';
+
+        $pdo = $this->get_bbdd();
+        $total = $pdo->prepare("SELECT COUNT(*) $from WHERE $condicion");
+        $total->execute($params);
+
+        // Si el texto es un código exacto, ese producto va primero.
+        $orden = 'p.description ASC, p.id ASC';
+        if (count($palabras) === 1) {
+            $orden = '(p.code = :exacto OR p.barcode = :exacto2 OR p.codigo_interno = :exacto3) DESC, ' . $orden;
+            $params[':exacto'] = $palabras[0];
+            $params[':exacto2'] = $palabras[0];
+            $params[':exacto3'] = $palabras[0];
+        }
+        $query = $pdo->prepare('SELECT ' . self::COLUMNAS_LISTA . " $from WHERE $condicion ORDER BY $orden LIMIT :limite OFFSET :desde");
+        foreach ($params as $clave => $valor) {
+            $query->bindValue($clave, $valor);
+        }
+        $query->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $query->bindValue(':desde', $desde, PDO::PARAM_INT);
+        $query->execute();
+
+        return [
+            'items' => $query->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            'total' => (int) $total->fetchColumn(),
+        ];
+    }
+
+    /**
+     * Productos del negocio por id (para refrescar solo los que se tocaron).
+     */
+    public function porIds(int $idNegocio, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn ($i) => $i > 0)));
+        if (!$ids) {
+            return [];
+        }
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $query = $this->get_bbdd()->prepare('SELECT ' . self::COLUMNAS_LISTA . "
+            FROM product p INNER JOIN negocio n ON n.id_negocio = p.id_negocio AND n.sucursal = p.sucursal
+            WHERE p.activo = 0 AND p.id_negocio = ? AND p.id IN ($marcas)");
+        $query->execute(array_merge([$idNegocio], $ids));
+        return $query->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Catálogo liviano para buscar y vender en el dispositivo (Caja, scanner, cambios).
+     *
+     * Sin $desde devuelve todos los productos activos. Con $desde, solo los que se
+     * modificaron después de esa fecha, y en "ids" la lista de ids activos para que
+     * el front borre los que ya no existen (los borrados no dejan fila).
+     *
+     * @return array{productos: array, ids: ?array, servidor: string, completo: bool}
+     */
+    public function catalogo(int $idNegocio, ?string $desde): array
+    {
+        $pdo = $this->get_bbdd();
+        $servidor = (string) $pdo->query('SELECT DATE_FORMAT(NOW(), "%Y-%m-%d %H:%i:%s")')->fetchColumn();
+        $columnas = 'p.id, p.description, p.code, p.codigo_interno AS codigoInterno, p.barcode, p.sale_price AS salePrice,
+            p.cost_price AS costPrice, p.quantity, p.sucursal, p.id_proveedor AS idProveedor, p.size';
+
+        try {
+            if ($desde !== null) {
+                $query = $pdo->prepare("SELECT $columnas FROM product p
+                    WHERE p.id_negocio = :n AND p.activo = 0 AND p.modificado >= :desde");
+                $query->execute([':n' => $idNegocio, ':desde' => $desde]);
+                $productos = $query->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+                $ids = $pdo->prepare('SELECT id FROM product WHERE id_negocio = :n AND activo = 0');
+                $ids->execute([':n' => $idNegocio]);
+
+                return [
+                    'productos' => $productos,
+                    'ids' => array_map('intval', $ids->fetchAll(PDO::FETCH_COLUMN) ?: []),
+                    'servidor' => $servidor,
+                    'completo' => false,
+                ];
+            }
+        } catch (\PDOException $e) {
+            // Base sin la migración 0003 (no existe "modificado"): se manda todo.
+            if ((int) ($e->errorInfo[1] ?? 0) !== 1054) {
+                throw $e;
+            }
+        }
+
+        $query = $pdo->prepare("SELECT $columnas FROM product p WHERE p.id_negocio = :n AND p.activo = 0 ORDER BY p.description");
+        $query->execute([':n' => $idNegocio]);
+
+        return [
+            'productos' => $query->fetchAll(PDO::FETCH_ASSOC) ?: [],
+            'ids' => null,
+            'servidor' => $servidor,
+            'completo' => true,
+        ];
+    }
+
+    /**
+     * Cambio rápido de precio de venta y/o stock de un producto (edición en la lista).
+     */
+    public function actualizarRapido(int $idNegocio, int $id, ?float $precio, ?int $stock, string $fecha): bool
+    {
+        $sets = [];
+        $params = [':id' => $id, ':n' => $idNegocio];
+        if ($precio !== null) {
+            $sets[] = 'sale_price = :precio, fecha_actualizado = :fecha';
+            $params[':precio'] = $precio;
+            $params[':fecha'] = $fecha;
+        }
+        if ($stock !== null) {
+            $sets[] = 'quantity = :stock';
+            $params[':stock'] = $stock;
+        }
+        if (!$sets) {
+            return false;
+        }
+        $query = $this->get_bbdd()->prepare('UPDATE product SET ' . implode(', ', $sets) . ' WHERE id = :id AND id_negocio = :n AND activo = 0');
+        $query->execute($params);
+        return true;
+    }
+
+    /**
+     * Edición masiva sobre productos del negocio. $cambios admite:
+     *  - porcentaje: sube/baja el precio de venta un % (redondeado hacia arriba)
+     *  - precio: fija el precio de venta
+     *  - proveedor: cambia el proveedor
+     *  - stock: fija el stock
+     *
+     * @return int productos modificados
+     */
+    public function editarMasivo(int $idNegocio, array $ids, array $cambios, string $fecha): int
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn ($i) => $i > 0)));
+        if (!$ids) {
+            return 0;
+        }
+        $sets = [];
+        $valores = [];
+        if (isset($cambios['porcentaje'])) {
+            $sets[] = 'sale_price = CEIL(sale_price + (sale_price * ? / 100))';
+            $valores[] = (float) $cambios['porcentaje'];
+        } elseif (isset($cambios['precio'])) {
+            $sets[] = 'sale_price = ?';
+            $valores[] = (float) $cambios['precio'];
+        }
+        if ($sets) {
+            $sets[] = 'fecha_actualizado = ?';
+            $valores[] = $fecha;
+        }
+        if (isset($cambios['proveedor'])) {
+            $sets[] = 'id_proveedor = ?';
+            $valores[] = (int) $cambios['proveedor'];
+        }
+        if (isset($cambios['stock'])) {
+            $sets[] = 'quantity = ?';
+            $valores[] = (int) $cambios['stock'];
+        }
+        if (!$sets) {
+            return 0;
+        }
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $query = $this->get_bbdd()->prepare('UPDATE product SET ' . implode(', ', $sets) . " WHERE id_negocio = ? AND activo = 0 AND id IN ($marcas)");
+        $query->execute(array_merge($valores, [$idNegocio], $ids));
+        return $query->rowCount();
+    }
+
+    /**
+     * Cuántas filas de una importación serían productos nuevos (para el límite del plan).
+     */
+    public function contarNuevosImportacion(int $idNegocio, int $sucursal, array $codigos): int
+    {
+        $codigos = array_values(array_unique(array_filter($codigos, fn ($c) => $c !== '')));
+        if (!$codigos) {
+            return 0;
+        }
+        $existentes = 0;
+        foreach (array_chunk($codigos, 500) as $lote) {
+            $marcas = implode(',', array_fill(0, count($lote), '?'));
+            $query = $this->get_bbdd()->prepare("SELECT COUNT(DISTINCT code) FROM product WHERE id_negocio = ? AND sucursal = ? AND activo = 0 AND code IN ($marcas)");
+            $query->execute(array_merge([$idNegocio, $sucursal], $lote));
+            $existentes += (int) $query->fetchColumn();
+        }
+        return count($codigos) - $existentes;
+    }
+
+    /**
+     * Importa productos desde una planilla. Si el código ya existe en esa sucursal se
+     * actualiza; si no, se crea. Todo en una transacción: si una fila rompe, no queda
+     * la importación a medias.
+     *
+     * @param array<int, array{code: string, description: string, costPrice: float, salePrice: float, quantity: ?int, idProveedor: ?int, barcode: ?string, size: ?string}> $filas
+     * @return array{creados: int, actualizados: int}
+     */
+    public function importar(int $idNegocio, int $sucursal, array $filas, string $fecha): array
+    {
+        $pdo = $this->get_bbdd();
+        $buscar = $pdo->prepare('SELECT id FROM product WHERE id_negocio = :n AND sucursal = :s AND code = :code AND activo = 0 LIMIT 1');
+        $actualizar = $pdo->prepare('UPDATE product SET description = :description, cost_price = :cost, sale_price = :sale,
+                quantity = COALESCE(:quantity, quantity), id_proveedor = COALESCE(:proveedor, id_proveedor),
+                barcode = COALESCE(:barcode, barcode), size = COALESCE(:size, size), fecha_actualizado = :fecha
+            WHERE id = :id');
+        $insertar = $pdo->prepare('INSERT INTO product
+            (description, cost_price, sale_price, quantity, id_proveedor, code, size, activo, id_negocio, sucursal, fecha_actualizado, barcode)
+            VALUES (:description, :cost, :sale, :quantity, :proveedor, :code, :size, 0, :n, :s, :fecha, :barcode)');
+
+        $creados = 0;
+        $actualizados = 0;
+        $pdo->beginTransaction();
+        try {
+            foreach ($filas as $fila) {
+                $buscar->execute([':n' => $idNegocio, ':s' => $sucursal, ':code' => $fila['code']]);
+                $id = $buscar->fetchColumn();
+                if ($id) {
+                    $actualizar->execute([
+                        ':description' => $fila['description'],
+                        ':cost' => $fila['costPrice'],
+                        ':sale' => $fila['salePrice'],
+                        ':quantity' => $fila['quantity'],
+                        ':proveedor' => $fila['idProveedor'],
+                        ':barcode' => $fila['barcode'],
+                        ':size' => $fila['size'],
+                        ':fecha' => $fecha,
+                        ':id' => (int) $id,
+                    ]);
+                    $actualizados++;
+                } else {
+                    $insertar->execute([
+                        ':description' => $fila['description'],
+                        ':cost' => $fila['costPrice'],
+                        ':sale' => $fila['salePrice'],
+                        ':quantity' => $fila['quantity'] ?? 0,
+                        ':proveedor' => $fila['idProveedor'],
+                        ':code' => $fila['code'],
+                        ':size' => $fila['size'],
+                        ':n' => $idNegocio,
+                        ':s' => $sucursal,
+                        ':fecha' => $fecha,
+                        ':barcode' => $fila['barcode'],
+                    ]);
+                    $creados++;
+                }
+            }
+            $pdo->commit();
+        } catch (\Throwable $th) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            if ($th instanceof \PDOException && (int) ($th->errorInfo[1] ?? 0) === 1062) {
+                throw new \RuntimeException('Hay un código de barras repetido en la planilla o que ya usa otro producto.');
+            }
+            throw $th;
+        }
+
+        return ['creados' => $creados, 'actualizados' => $actualizados];
+    }
 }

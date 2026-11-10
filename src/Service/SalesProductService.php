@@ -23,9 +23,12 @@ class SalesProductService
         return $this->rep_salesProduct->obtenerIdNegocioVenta($idSaleProduct);
     }
 
-    public function save_salesProduct(array $datosDto)
+    /**
+     * @return bool|string true si se guardó, "duplicada" si esa clave ya se había registrado.
+     */
+    public function save_salesProduct(array $datosDto, ?string $clave = null)
     {
-        return $this->rep_salesProduct->save_salesProduct($datosDto);
+        return $this->rep_salesProduct->save_salesProduct($datosDto, $clave);
     }
 
     public function delete_salesProduct(DeleteSalesProductDTO $dto)

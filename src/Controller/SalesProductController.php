@@ -34,6 +34,18 @@ class SalesProductController extends BaseController
 
         // Formatear la fecha al formato deseado (YYYY-MM-DD)
         $fechaFormateada = $fechaArgentina->format('Y-m-d H:i:s');
+
+        // Venta hecha sin conexión que se envía después: el front manda la hora real de
+        // la venta. Se acepta solo si es de los últimos 7 días y no es futura.
+        $fechaOffline = (string) $request->headers->get('X-Venta-Fecha', '');
+        if ($fechaOffline !== '') {
+            $f = \DateTime::createFromFormat('Y-m-d H:i:s', $fechaOffline, $zonaHorariaArgentina);
+            if ($f && $f <= $fechaArgentina && $f >= (clone $fechaArgentina)->modify('-7 days')) {
+                $fechaFormateada = $f->format('Y-m-d H:i:s');
+            }
+        }
+        $clave = (string) $request->headers->get('X-Venta-Clave', '');
+        $clave = preg_match('/^[A-Za-z0-9-]{8,64}$/', $clave) ? $clave : null;
         $idNegocioUsuario = $this->idNegocioUsuarioActual();
         foreach ($datos as $venta) {
             if ($check = $this->sucursalPermitida($venta['sucursal'] ?? null)) {
@@ -64,7 +76,10 @@ class SalesProductController extends BaseController
 
         if (!$errores) {
             try {
-                $sales_product = $salesProduct_service->save_salesProduct($datosDto);
+                $sales_product = $salesProduct_service->save_salesProduct($datosDto, $clave);
+                if ($sales_product === 'duplicada') {
+                    return $this->respuesta(200, [true], [], 200, ['X-Venta-Duplicada' => '1']);
+                }
                 return $this->respuesta(200, [$sales_product], []);
             } catch (\Throwable $th) {
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
