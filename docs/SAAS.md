@@ -10,7 +10,8 @@ Todo corre en el VPS actual, sin Docker.
    variables nuevas: `APP_URL_FRONT`, `MAIL_FROM`, `MAILER_DSN`,
    `GOOGLE_CLIENT_IDS`, `TURNSTILE_SECRET`/`TURNSTILE_SITE_KEY`, `DIAS_PRUEBA`,
    `PLAN_PRUEBA`, `DIAS_GRACIA_MORA`, `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET`,
-   `MP_BACK_URL`.
+   `MP_BACK_URL`, `ADMIN_EMAILS` (a quién avisar por mail de altas, planes, cobros y
+   cancelaciones; varios separados por coma).
    **Ojo:** si existe `.env.local.php` (lo genera `composer dump-env`), Symfony
    usa ese archivo e ignora el `.env`. Regeneralo con `composer dump-env prod`
    después de agregar las variables, o renombralo para que se lea el `.env`.

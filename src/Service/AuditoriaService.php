@@ -15,12 +15,14 @@ class AuditoriaService
     private BaseRepository $repo;
     private TenantContext $tenant;
     private RequestStack $requestStack;
+    private AvisoAdminService $avisoAdmin;
 
-    public function __construct(BaseRepository $repo, TenantContext $tenant, RequestStack $requestStack)
+    public function __construct(BaseRepository $repo, TenantContext $tenant, RequestStack $requestStack, AvisoAdminService $avisoAdmin)
     {
         $this->repo = $repo;
         $this->tenant = $tenant;
         $this->requestStack = $requestStack;
+        $this->avisoAdmin = $avisoAdmin;
     }
 
     public function registrar(string $accion, array $detalle = [], ?int $idNegocio = null, ?int $idUsuario = null): void
@@ -39,6 +41,12 @@ class AuditoriaService
             ]);
         } catch (\Throwable $th) {
             error_log('Auditoría: no se pudo registrar ' . $accion . ': ' . $th->getMessage());
+        }
+        // Altas, planes, cobros y cancelaciones también se avisan por mail a los dueños de Kontia.
+        try {
+            $this->avisoAdmin->notificar($accion, $detalle, $idNegocio ?? $this->tenant->usuario()?->getIdNegocio());
+        } catch (\Throwable $th) {
+            error_log('Aviso admin: ' . $th->getMessage());
         }
     }
 }

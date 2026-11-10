@@ -43,6 +43,44 @@ class RegistroTest extends KontiaTestCase
         $this->assertSame('Kiosco Pepe', $this->pdo()->query('SELECT nombre FROM negocio WHERE id_negocio = 8')->fetchColumn());
     }
 
+    public function testAvisaPorMailALosAdministradoresDeKontia(): void
+    {
+        $_ENV['ADMIN_EMAILS'] = 'admin1@test.com, admin2@test.com';
+        try {
+            [$codigo] = $this->pedir('POST', '/api/registro', $this->datosRegistro());
+            $this->assertSame(201, $codigo);
+            $avisos = array_values(array_filter(
+                $this->getMailerMessages(),
+                fn ($m) => str_starts_with((string) $m->getSubject(), '[Kontia] Nuevo negocio registrado')
+            ));
+            $this->assertCount(1, $avisos);
+            $this->assertSame('[Kontia] Nuevo negocio registrado: Kiosco Pepe', $avisos[0]->getSubject());
+            $this->assertSame(['admin1@test.com', 'admin2@test.com'], array_map(fn ($a) => $a->getAddress(), $avisos[0]->getTo()));
+            $this->assertStringContainsString('pepe@test.com', (string) $avisos[0]->getHtmlBody());
+        } finally {
+            unset($_ENV['ADMIN_EMAILS']);
+        }
+    }
+
+    public function testSinAdminEmailsNoSeMandaAviso(): void
+    {
+        unset($_ENV['ADMIN_EMAILS']);
+        $this->pedir('POST', '/api/registro', $this->datosRegistro());
+        foreach ($this->getMailerMessages() as $m) {
+            $this->assertStringStartsNotWith('[Kontia]', (string) $m->getSubject());
+        }
+    }
+
+    public function testAsuntoDelAvisoDeCobro(): void
+    {
+        $aviso = static::getContainer()->get(\App\Service\AvisoAdminService::class);
+        [$asunto, $filas] = $aviso->armar('pago_suscripcion', ['estado' => 'rejected', 'mp_id' => 'X1'], ['nombre' => 'Kiosco', 'id_negocio' => 3]);
+        $this->assertSame('Cobro rechazado: Kiosco', $asunto);
+        $this->assertSame('X1', $filas['ID en Mercado Pago']);
+        [$asunto] = $aviso->armar('pago_suscripcion', ['estado' => 'approved'], []);
+        $this->assertSame('Cobro aprobado', $asunto);
+    }
+
     public function testNoEntraHastaVerificarElEmail(): void
     {
         $this->pedir('POST', '/api/registro', $this->datosRegistro());

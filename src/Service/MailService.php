@@ -52,19 +52,43 @@ class MailService
         return $this->enviar($email, $asunto, $this->plantilla('Hola,', $mensaje, $boton, $this->urlFront('/mi-plan')));
     }
 
-    private function enviar(string $para, string $asunto, string $html): bool
+    /**
+     * Aviso interno para los dueños de Kontia (ver AvisoAdminService).
+     *
+     * @param string[] $para
+     * @param array<string, string> $filas
+     */
+    public function enviarAdmin(array $para, string $asunto, array $filas): bool
     {
+        $e = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $tabla = '';
+        foreach ($filas as $clave => $valor) {
+            $tabla .= '<tr><td style="padding:4px 12px 4px 0;color:#777">' . $e($clave) . '</td>'
+                . '<td style="padding:4px 0"><strong>' . $e($valor) . '</strong></td></tr>';
+        }
+        $html = '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#222">'
+            . '<h2 style="color:#2a8253">Kontia</h2>'
+            . '<p>' . $e($asunto) . '</p>'
+            . '<table style="border-collapse:collapse;font-size:14px">' . $tabla . '</table>'
+            . '</div>';
+        return $this->enviar($para, '[Kontia] ' . $asunto, $html);
+    }
+
+    /** @param string|string[] $para */
+    private function enviar(string|array $para, string $asunto, string $html): bool
+    {
+        $destino = is_array($para) ? implode(', ', $para) : $para;
         try {
             $email = (new Email())
                 ->from(Address::create(Entorno::get('MAIL_FROM', 'Kontia <no-responder@ventas-xpress.com.ar>')))
-                ->to($para)
+                ->to(...(array) $para)
                 ->subject($asunto)
                 ->html($html)
                 ->text(strip_tags(str_replace(['<br>', '</p>'], "\n", $html)));
             $this->mailer->send($email);
             return true;
         } catch (\Throwable $th) {
-            error_log('Mail: no se pudo enviar "' . $asunto . '" a ' . $para . ': ' . $th->getMessage());
+            error_log('Mail: no se pudo enviar "' . $asunto . '" a ' . $destino . ': ' . $th->getMessage());
             return false;
         }
     }
