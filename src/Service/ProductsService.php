@@ -90,6 +90,12 @@ class ProductsService
         return $this->rep_products->actualizarRapido($idNegocio, $id, $precio, $stock, $this->get_fecha_hora_actual());
     }
 
+    /** @param array<int, float> $precios id => precio */
+    public function actualizarPrecios(int $idNegocio, array $precios): int
+    {
+        return $this->rep_products->actualizarPrecios($idNegocio, array_slice($precios, 0, 1000, true), $this->get_fecha_hora_actual());
+    }
+
     public function editarMasivo(int $idNegocio, array $ids, array $cambios): int
     {
         return $this->rep_products->editarMasivo($idNegocio, array_slice($ids, 0, 5000), $cambios, $this->get_fecha_hora_actual());

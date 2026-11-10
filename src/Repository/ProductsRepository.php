@@ -367,8 +367,9 @@ class ProductsRepository extends BaseRepository
         $total = $pdo->prepare("SELECT COUNT(*) $from WHERE $condicion");
         $total->execute($params);
 
-        // Si el texto es un código exacto, ese producto va primero.
-        $orden = 'p.description ASC, p.id ASC';
+        // Los que no tienen stock van al final. Si el texto es un código
+        // exacto, ese producto va primero igual (aunque no tenga stock).
+        $orden = '(p.quantity <= 0) ASC, p.description ASC, p.id ASC';
         if (count($palabras) === 1) {
             $orden = '(p.code = :exacto OR p.barcode = :exacto2 OR p.codigo_interno = :exacto3) DESC, ' . $orden;
             $params[':exacto'] = $palabras[0];
@@ -479,6 +480,32 @@ class ProductsRepository extends BaseRepository
         $query = $this->get_bbdd()->prepare('UPDATE product SET ' . implode(', ', $sets) . ' WHERE id = :id AND id_negocio = :n AND activo = 0');
         $query->execute($params);
         return true;
+    }
+
+    /**
+     * Cambia el precio de venta de varios productos del negocio, cada uno con
+     * su propio precio (Precios desactualizados). Todo o nada.
+     *
+     * @param array<int, float> $precios id => precio
+     * @return int productos modificados
+     */
+    public function actualizarPrecios(int $idNegocio, array $precios, string $fecha): int
+    {
+        $pdo = $this->get_bbdd();
+        $query = $pdo->prepare('UPDATE product SET sale_price = :precio, fecha_actualizado = :fecha WHERE id = :id AND id_negocio = :n AND activo = 0');
+        $modificados = 0;
+        $pdo->beginTransaction();
+        try {
+            foreach ($precios as $id => $precio) {
+                $query->execute([':precio' => $precio, ':fecha' => $fecha, ':id' => $id, ':n' => $idNegocio]);
+                $modificados += $query->rowCount();
+            }
+            $pdo->commit();
+        } catch (\Throwable $th) {
+            $pdo->rollBack();
+            throw $th;
+        }
+        return $modificados;
     }
 
     /**

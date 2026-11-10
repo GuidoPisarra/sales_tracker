@@ -127,4 +127,40 @@ class ReportRepository extends BaseRepository
 
         return $incomes[0];
     }
+
+    /**
+     * Ingresos, egresos y cambios agrupados por mes, entre $desde (incluido) y
+     * $hasta (excluido), con las mismas cuentas que report_incomes,
+     * report_expenses y report_changes. Devuelve ['2026-11' => [...], ...]
+     * solo con los meses que tienen algún movimiento.
+     */
+    public function balancePorMes(int $idNegocio, string $desde, string $hasta): array
+    {
+        $pdo = $this->get_bbdd();
+        $consultas = [
+            'ingresos' => 'SELECT DATE_FORMAT(sp.sale_product_date, \'%Y-%m\') AS mes, COALESCE(SUM(sp.price * sp.quantity), 0) AS monto
+                FROM sales_product sp
+                JOIN sales s ON s.id = sp.id_sale
+                JOIN product p ON p.id = s.id_product
+                WHERE sp.id_negocio = :n AND sp.sale_product_date >= :desde AND sp.sale_product_date < :hasta
+                GROUP BY mes',
+            'egresos' => 'SELECT DATE_FORMAT(e.date_expense, \'%Y-%m\') AS mes, COALESCE(SUM(e.price), 0) AS monto
+                FROM expense e
+                WHERE e.id_negocio = :n AND e.date_expense >= :desde AND e.date_expense < :hasta
+                GROUP BY mes',
+            'cambios' => 'SELECT DATE_FORMAT(c.fecha_cambio, \'%Y-%m\') AS mes, COALESCE(SUM(c.precio_producto_cambio - c.precio_producto_nuevo), 0) AS monto
+                FROM cambios c
+                WHERE c.id_negocio = :n AND c.fecha_cambio >= :desde AND c.fecha_cambio < :hasta
+                GROUP BY mes',
+        ];
+        $meses = [];
+        foreach ($consultas as $campo => $sql) {
+            $query = $pdo->prepare($sql);
+            $query->execute([':n' => $idNegocio, ':desde' => $desde, ':hasta' => $hasta]);
+            foreach ($query->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+                $meses[$fila['mes']][$campo] = (float) $fila['monto'];
+            }
+        }
+        return $meses;
+    }
 }

@@ -75,6 +75,26 @@ class ReportController extends BaseController
     }
 
     /**
+     * Balance mes a mes para el gráfico: ?meses=12 (máximo 24). Solo titular.
+     */
+    #[Route('/balance_meses', name: 'app_report_balance_meses', methods: ['GET'])]
+    public function balanceMeses(Request $request, ReportService $report_service): JsonResponse
+    {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
+        $idNegocio = $this->idNegocioUsuarioActual();
+        try {
+            $hoy = new \DateTimeImmutable('now', new \DateTimeZone('America/Argentina/Buenos_Aires'));
+            $meses = $report_service->balanceUltimosMeses($idNegocio, (int) $request->query->get('meses', 12), $hoy);
+            return $this->respuesta(200, ['meses' => $meses], []);
+        } catch (\Throwable $th) {
+            error_log('balance_meses: ' . $th->getMessage());
+            return $this->respuesta(400, [], ['No se pudo obtener el balance.'], 400);
+        }
+    }
+
+    /**
      * ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (ambos incluidos) => [desde 00:00, día siguiente a hasta 00:00).
      * Sin parámetros válidos devuelve [null, null] (todas las ventas, como antes).
      */

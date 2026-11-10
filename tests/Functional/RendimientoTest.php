@@ -232,4 +232,62 @@ class RendimientoTest extends KontiaTestCase
         $this->assertSame(200, $codigo);
         $this->assertEquals(100, $r['datos'][0]['deuda']);
     }
+
+    public function testSinStockVanAlFinalSalvoCodigoExacto(): void
+    {
+        $this->producto(1, 'Abanico', 'A1', 100, 0);
+        $this->producto(1, 'Balde', 'B1', 100, 5);
+        $this->producto(1, 'Canasto', 'C1', 100, 2);
+
+        [, $r] = $this->pedir('GET', '/api/products/buscar', null, $this->token);
+        $this->assertSame(['Balde', 'Canasto', 'Abanico'], array_column($r['datos']['items'], 'description'));
+
+        // Escaneado o tipeado el código exacto, va primero aunque no tenga stock.
+        [, $r] = $this->pedir('GET', '/api/products/buscar?q=A1', null, $this->token);
+        $this->assertSame('Abanico', $r['datos']['items'][0]['description']);
+    }
+
+    public function testVariosPreciosALaVezSoloTitularYSoloSusProductos(): void
+    {
+        $a = $this->producto(1, 'Alfajor', 'A1', 100);
+        $b = $this->producto(1, 'Bombón', 'B1', 200);
+        $ajeno = $this->producto(2, 'Ajeno', 'Z1', 300);
+        $cuerpo = ['items' => [['id' => $a, 'salePrice' => 150], ['id' => $b, 'salePrice' => 250.5], ['id' => $ajeno, 'salePrice' => 1]]];
+
+        [$codigo] = $this->pedir('POST', '/api/products/precios', $cuerpo, $this->tokenEmpleado);
+        $this->assertSame(403, $codigo);
+
+        [$codigo, $r] = $this->pedir('POST', '/api/products/precios', $cuerpo, $this->token);
+        $this->assertSame(200, $codigo);
+        $this->assertSame(2, $r['datos']['modificados']);
+        $precios = $this->pdo()->query("SELECT id, sale_price FROM product ORDER BY id")->fetchAll(\PDO::FETCH_ASSOC);
+        $this->assertEquals([150, 250.5, 300], array_map('floatval', array_column($precios, 'sale_price')));
+
+        [$codigo] = $this->pedir('POST', '/api/products/precios', ['items' => [['id' => $a, 'salePrice' => 0]]], $this->token);
+        $this->assertSame(400, $codigo);
+    }
+
+    public function testBalanceDeLosUltimosMesesEmpiezaEnElPrimerMovimiento(): void
+    {
+        $p = $this->producto(1, 'Remera', 'R1');
+        $hoy = new \DateTimeImmutable('now', new \DateTimeZone('America/Argentina/Buenos_Aires'));
+        $haceDos = $hoy->modify('first day of this month')->modify('-2 months')->setTime(12, 0);
+        $idSale = $this->insertar('INSERT INTO sales (id_product, id_negocio) VALUES (?, 1)', [$p]);
+        $this->insertar('INSERT INTO sales_product (id_sale, id_product, quantity, price, sale_product_date, type_payment, id_negocio, sucursal) VALUES (?, ?, 2, 100, ?, "Efectivo", 1, 1)', [$idSale, $p, $haceDos->format('Y-m-d H:i:s')]);
+        $this->insertar('INSERT INTO expense (price, description, date_expense, id_negocio) VALUES (50, "Luz", ?, 1)', [$hoy->format('Y-m-d')]);
+        $this->insertar('INSERT INTO expense (price, description, date_expense, id_negocio) VALUES (999, "Ajeno", ?, 2)', [$hoy->format('Y-m-d')]);
+
+        [$codigo] = $this->pedir('GET', '/api/report/balance_meses', null, $this->tokenEmpleado);
+        $this->assertSame(403, $codigo);
+
+        [$codigo, $r] = $this->pedir('GET', '/api/report/balance_meses?meses=12', null, $this->token);
+        $this->assertSame(200, $codigo);
+        $meses = $r['datos']['meses'];
+        $this->assertCount(3, $meses);
+        $this->assertSame((int) $haceDos->format('n'), $meses[0]['mes']);
+        $this->assertEquals(200, $meses[0]['ingresos']);
+        $this->assertEquals(0, $meses[1]['total']);
+        $this->assertEquals(50, $meses[2]['egresos']);
+        $this->assertEquals(-50, $meses[2]['total']);
+    }
 }

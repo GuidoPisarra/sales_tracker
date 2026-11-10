@@ -423,6 +423,43 @@ class ProductsController extends BaseController
     }
 
     /**
+     * Varios precios a la vez, cada producto con el suyo (solo administrador):
+     * {items: [{id, salePrice}, ...]}. Lo usa "Precios desactualizados".
+     */
+    #[Route('/precios', name: 'app_products_precios', methods: ['POST'])]
+    public function precios(Request $request, ProductsService $products_service): JsonResponse
+    {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
+        $idNegocio = $this->idNegocioUsuarioActual();
+        $datos = json_decode($request->getContent(), true) ?: [];
+        $items = is_array($datos['items'] ?? null) ? $datos['items'] : [];
+        $precios = [];
+        foreach ($items as $item) {
+            $id = (int) ($item['id'] ?? 0);
+            $precio = $item['salePrice'] ?? null;
+            if ($id <= 0 || !is_numeric($precio) || (float) $precio <= 0) {
+                return $this->respuesta(400, [], ['Hay un precio inválido: tiene que ser mayor a cero.'], 400);
+            }
+            $precios[$id] = round((float) $precio, 2);
+        }
+        if (!$precios) {
+            return $this->respuesta(400, [], ['Elegí al menos un producto.'], 400);
+        }
+        if (count($precios) > 1000) {
+            return $this->respuesta(400, [], ['Se pueden actualizar hasta 1000 productos por vez.'], 400);
+        }
+        try {
+            $modificados = $products_service->actualizarPrecios($idNegocio, $precios);
+            return $this->respuesta(200, ['modificados' => $modificados], []);
+        } catch (\Throwable $th) {
+            error_log('precios varios: ' . $th->getMessage());
+            return $this->respuesta(400, [], ['No se pudieron actualizar los precios.'], 400);
+        }
+    }
+
+    /**
      * Edición masiva (solo administrador): {ids: [...], cambios: {porcentaje?|precio?, proveedor?, stock?}}.
      */
     #[Route('/masivo', name: 'app_products_masivo', methods: ['POST'])]
