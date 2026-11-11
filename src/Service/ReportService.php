@@ -21,6 +21,11 @@ class ReportService
         $this->rep_change = $rep_change;
     }
 
+    public function resumenVentas(int $id_negocio, string $desde, string $hasta): array
+    {
+        return $this->rep_report->resumenVentas($id_negocio, $desde, $hasta);
+    }
+
     public function report_salesProduct_recientes(int $id_negocio, int $dias)
     {
         $dias = $dias > 0 ? $dias : 15;
@@ -36,10 +41,10 @@ class ReportService
         }, $filas);
     }
 
-    public function report_salesProduct(int $id_negocio)
+    public function report_salesProduct(int $id_negocio, ?string $desde = null, ?string $hasta = null)
     {
-        $ventas = $this->rep_report->report_salesProduct($id_negocio);
-        $cambios = $this->rep_change->list_changes($id_negocio);
+        $ventas = $this->rep_report->report_salesProduct($id_negocio, $desde, $hasta);
+        $cambios = $this->rep_change->list_changes($id_negocio, $desde, $hasta);
         $resultado = [];
         $resultado['cambios'] = $this->agruparCambios($cambios ?? []);
         $ventasAgrupadas = [];
@@ -69,8 +74,6 @@ class ReportService
 
         // Ahora $resultado contiene la estructura deseada con las ventas agrupadas en una lista
 
-        // Convierte $resultado a JSON si es necesario
-        $jsonResultado = json_encode($resultado);
         return $resultado;
     }
     /**
@@ -124,6 +127,45 @@ class ReportService
         unset($grupo);
 
         return array_values($grupos);
+    }
+
+    /**
+     * Balance de los últimos $cantidad meses (incluido el actual), del más viejo
+     * al más nuevo. Los meses anteriores al primer movimiento del negocio no
+     * se devuelven (si usa Kontia hace 4 meses, vienen 4).
+     */
+    public function balanceUltimosMeses(int $idNegocio, int $cantidad, \DateTimeImmutable $hoy): array
+    {
+        $cantidad = max(1, min(24, $cantidad));
+        $inicioMesActual = $hoy->modify('first day of this month')->setTime(0, 0);
+        $desde = $inicioMesActual->modify('-' . ($cantidad - 1) . ' months');
+        $hasta = $inicioMesActual->modify('+1 month');
+        $datos = $this->rep_report->balancePorMes($idNegocio, $desde->format('Y-m-d H:i:s'), $hasta->format('Y-m-d H:i:s'));
+
+        $meses = [];
+        $empezo = false;
+        for ($i = 0; $i < $cantidad; $i++) {
+            $mes = $desde->modify("+$i months");
+            $clave = $mes->format('Y-m');
+            $d = $datos[$clave] ?? [];
+            if (!$empezo && !$d) {
+                continue;
+            }
+            $empezo = true;
+            $ingresos = $d['ingresos'] ?? 0.0;
+            $egresos = $d['egresos'] ?? 0.0;
+            // Igual que report_incomes_expenses: la diferencia de los cambios va en positivo.
+            $cambios = abs($d['cambios'] ?? 0.0);
+            $meses[] = [
+                'anio' => (int) $mes->format('Y'),
+                'mes' => (int) $mes->format('n'),
+                'ingresos' => round($ingresos, 2),
+                'egresos' => round($egresos, 2),
+                'cambios' => round($cambios, 2),
+                'total' => round($ingresos - $egresos + $cambios, 2),
+            ];
+        }
+        return $meses;
     }
 
     public function report_incomes_expenses(int $month, int $year, $id_negocio): ReportIncomesExpensesDTO

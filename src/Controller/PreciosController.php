@@ -10,9 +10,14 @@ use Symfony\Component\Routing\Annotation\Route;
 #[Route('/api/precios')]
 class PreciosController extends BaseController
 {
-    #[Route('/desactualizados/{id_negocio}', name: 'app_precios_desactualizados', methods: ['GET'])]
-    public function desactualizados(int $id_negocio, Request $request, PreciosService $precios_service): JsonResponse
+    #[Route('/desactualizados', name: 'app_precios_desactualizados_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/desactualizados/{id_negocio}', name: 'app_precios_desactualizados', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function desactualizados(?int $id_negocio, Request $request, PreciosService $precios_service): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }

@@ -20,9 +20,11 @@ class CuentaCorrienteController extends BaseController
 {
 
 
-    #[Route('/obtener_cuentas_corrientes/{id_negocio}', name: 'app_obtener_cuentas_corrientes', methods: ['GET'])]
-    public function cuentas_list(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, int $id_negocio): JsonResponse
+    #[Route('/obtener_cuentas_corrientes', name: 'app_obtener_cuentas_corrientes_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/obtener_cuentas_corrientes/{id_negocio}', name: 'app_obtener_cuentas_corrientes', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function cuentas_list(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }
@@ -31,17 +33,17 @@ class CuentaCorrienteController extends BaseController
             $list_cuentas_corrientes = $service->list_cuentas_corrientes($id_negocio);
             return $this->respuesta(200, $list_cuentas_corrientes, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
 
-    #[Route('/obtener_cuentas_corrientes_con_deuda/{id_negocio}', name: 'app_obtener_cuentas_corrientes_con_deuda', methods: ['GET'])]
-    public function cuentass_list_con_deuda(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, int $id_negocio): JsonResponse
+    #[Route('/obtener_cuentas_corrientes_con_deuda', name: 'app_obtener_cuentas_corrientes_con_deuda_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/obtener_cuentas_corrientes_con_deuda/{id_negocio}', name: 'app_obtener_cuentas_corrientes_con_deuda', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function cuentass_list_con_deuda(Request $request, ValidatorInterface $validator, CuentaCorrienteService $service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }
@@ -50,10 +52,8 @@ class CuentaCorrienteController extends BaseController
             $list_cuentas_corrientes = $service->list_cuentas_corrientes_con_deuda($id_negocio);
             return $this->respuesta(200, $list_cuentas_corrientes, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -67,7 +67,6 @@ class CuentaCorrienteController extends BaseController
 
         $errores = $this->obtener_validaciones($validator, $dto);
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -85,7 +84,6 @@ class CuentaCorrienteController extends BaseController
         try {
             $resultado = $service->add_agregar_venta_cuenta_corriente($dto);
             if ($resultado !== true) {
-                //$log::get_log()->error('ENDPOINT: app_agregar_gastos ERROR: Ocurrió un error grabando el gasto.');
                 throw new \Exception("Ocurrió un error al agregar el producto.");
             }
             $respuesta = [
@@ -93,11 +91,9 @@ class CuentaCorrienteController extends BaseController
             ];
             return $this->respuesta(200, $respuesta, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], [$th->getMessage()], 400);
         }
 
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -116,10 +112,8 @@ class CuentaCorrienteController extends BaseController
             $movimientos = $service->obtener_movimientos_cliente($id);
             return $this->respuesta(200, $movimientos, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -133,7 +127,6 @@ class CuentaCorrienteController extends BaseController
 
         $errores = $this->obtener_validaciones($validator, $dto);
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -148,7 +141,6 @@ class CuentaCorrienteController extends BaseController
         try {
             $resultado = $service->agregar_pago($dto);
             if ($resultado !== true) {
-                //$log::get_log()->error('ENDPOINT: app_agregar_gastos ERROR: Ocurrió un error grabando el gasto.');
                 throw new \Exception("Ocurrió un error al agregar el producto.");
             }
             $respuesta = [
@@ -156,11 +148,9 @@ class CuentaCorrienteController extends BaseController
             ];
             return $this->respuesta(200, $respuesta, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], [$th->getMessage()], 400);
         }
 
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 
@@ -174,7 +164,6 @@ class CuentaCorrienteController extends BaseController
 
         $errores = $this->obtener_validaciones($validator, $dto);
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -184,7 +173,6 @@ class CuentaCorrienteController extends BaseController
         try {
             $resultado = $service->agregar_cliente($dto);
             if ($resultado !== true) {
-                //$log::get_log()->error('ENDPOINT: app_agregar_gastos ERROR: Ocurrió un error grabando el gasto.');
                 throw new \Exception("Ocurrió un error al agregar el producto.");
             }
             $respuesta = [
@@ -192,11 +180,9 @@ class CuentaCorrienteController extends BaseController
             ];
             return $this->respuesta(200, $respuesta, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: app_agregar_productos ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], [$th->getMessage()], 400);
         }
 
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 

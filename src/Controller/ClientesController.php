@@ -13,9 +13,11 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class ClientesController extends BaseController
 {
 
-    #[Route('/obtener_clientes/{id_negocio}', name: 'app_obtener_clientes', methods: ['GET'])]
-    public function change_product(Request $request, ValidatorInterface $validator, ClientesService $clientes_service, $id_negocio): JsonResponse
+    #[Route('/obtener_clientes', name: 'app_obtener_clientes_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+    #[Route('/obtener_clientes/{id_negocio}', name: 'app_obtener_clientes', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+    public function change_product(Request $request, ValidatorInterface $validator, ClientesService $clientes_service, ?int $id_negocio): JsonResponse
     {
+        $id_negocio ??= $this->idNegocioUsuarioActual();
         if ($check = $this->negocioPermitido($id_negocio)) {
             return $check;
         }
@@ -24,10 +26,8 @@ class ClientesController extends BaseController
             $list_clientes = $clientes_service->list_clientes($id_negocio);
             return $this->respuesta(200, $list_clientes, []);
         } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
             return $this->respuesta(400, [], ['Ocurrió un error al obtener los clientes.'], 400);
         }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
     }
 }

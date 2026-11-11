@@ -10,6 +10,8 @@ use App\Service\NotificacionesService;
 use App\Service\PlanService;
 use App\Service\PreciosService;
 use App\Service\ServicioUsuario;
+use App\Service\SuscripcionService;
+use App\Service\AuditoriaService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 
 class AuthenticationSuccessListener
@@ -22,8 +24,10 @@ class AuthenticationSuccessListener
     private $notificacionesService;
     private $planService;
     private $preciosService;
+    private $suscripcionService;
+    private $auditoria;
 
-    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service, PlanService $plan_service, PreciosService $precios_service)
+    public function __construct(RequestStack $requestStack, ServicioUsuario $servicio_usuario, AppLogs $logs, NotificacionesService $notificaciones_service, PlanService $plan_service, PreciosService $precios_service, SuscripcionService $suscripcion_service, AuditoriaService $auditoria)
     {
         $this->requestStack = $requestStack;
         $this->servicioUsuario = $servicio_usuario;
@@ -31,6 +35,8 @@ class AuthenticationSuccessListener
         $this->notificacionesService = $notificaciones_service;
         $this->planService = $plan_service;
         $this->preciosService = $precios_service;
+        $this->suscripcionService = $suscripcion_service;
+        $this->auditoria = $auditoria;
     }
     public function onAuthenticationSuccess(AuthenticationSuccessEvent $event)
     {
@@ -45,22 +51,31 @@ class AuthenticationSuccessListener
         }
         $datos_usuario = $this->servicioUsuario->get_rol_id_usuario($user->get_email());
 
-        $this->servicioUsuario->actualizarUltimoIngreso($user->get_email());
+        // Con PDO en modo excepción, un error en algo accesorio (último
+        // ingreso, notificaciones, plan, conteo de precios) ya no puede dejar a
+        // nadie sin poder entrar: se registra en el log y se sigue.
+        $this->intentar('actualizar último ingreso', fn () => $this->servicioUsuario->actualizarUltimoIngreso($user->get_email()));
 
-        $notificaciones = $this->notificacionesService->obtenerPorUsuario(
+        $notificaciones = $this->intentar('obtener notificaciones', fn () => $this->notificacionesService->obtenerPorUsuario(
             (int) $datos_usuario['id'],
             (int) $datos_usuario['id_negocio']
-        );
+        ), []);
 
-        $plan = $this->planService->obtenerPorNegocio((int) $datos_usuario['id_negocio']);
+        $plan = $this->intentar('obtener plan', fn () => $this->planService->obtenerPorNegocio((int) $datos_usuario['id_negocio']));
 
         // El conteo de precios desactualizados solo tiene sentido para quien puede hacer algo
         // con ese dato (dueño/admin del negocio) — para un empleado queda en null.
         $roles = json_decode($datos_usuario['role'] ?? '', true);
         $esAdmin = is_array($roles) && in_array(self::ROL_ADMIN, $roles, true);
         $preciosDesactualizados = $esAdmin
-            ? $this->preciosService->contarPreciosDesactualizados((int) $datos_usuario['id_negocio'])
+            ? $this->intentar('contar precios desactualizados', fn () => $this->preciosService->contarPreciosDesactualizados((int) $datos_usuario['id_negocio']))
             : null;
+
+        $suscripcion = $this->intentar('obtener suscripción', fn () => $this->suscripcionService->resumen((int) $datos_usuario['id_negocio']));
+
+        if ($request && str_ends_with($request->getPathInfo(), '/login')) {
+            $this->auditoria->registrar('login', ['via' => 'clave'], (int) $datos_usuario['id_negocio'], (int) $datos_usuario['id']);
+        }
 
         $data = [
             'token' => $data['token'],
@@ -71,10 +86,25 @@ class AuthenticationSuccessListener
             'nombre' => $datos_usuario['name'],
             'notificaciones' => $notificaciones,
             'plan' => $plan,
+            'suscripcion' => $suscripcion,
             'asistente_ia' => (bool) $datos_usuario['asistente_ia'],
             'precios_desactualizados' => $preciosDesactualizados
         ];
 
         $event->setData($data);
+    }
+
+    /**
+     * Ejecuta un paso accesorio del login. Si falla devuelve $siFalla y deja
+     * el detalle en el log del servidor.
+     */
+    private function intentar(string $paso, callable $accion, mixed $siFalla = null): mixed
+    {
+        try {
+            return $accion();
+        } catch (\Throwable $th) {
+            error_log('Login: no se pudo ' . $paso . ': ' . $th->getMessage());
+            return $siFalla;
+        }
     }
 }

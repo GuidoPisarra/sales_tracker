@@ -18,19 +18,17 @@ class SalesProductService
         $this->rep_salesProduct = $rep_salesProduct;
     }
 
-    public function list_salesProduct(int $id_negocio)
-    {
-        return $this->rep_salesProduct->list_salesProduct($id_negocio);
-    }
-
     public function obtenerIdNegocioVenta(int $idSaleProduct): ?int
     {
         return $this->rep_salesProduct->obtenerIdNegocioVenta($idSaleProduct);
     }
 
-    public function save_salesProduct(array $datosDto)
+    /**
+     * @return bool|string true si se guardó, "duplicada" si esa clave ya se había registrado.
+     */
+    public function save_salesProduct(array $datosDto, ?string $clave = null)
     {
-        return $this->rep_salesProduct->save_salesProduct($datosDto);
+        return $this->rep_salesProduct->save_salesProduct($datosDto, $clave);
     }
 
     public function delete_salesProduct(DeleteSalesProductDTO $dto)

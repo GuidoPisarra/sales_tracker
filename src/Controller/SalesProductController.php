@@ -19,21 +19,6 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 class SalesProductController extends BaseController
 {
 
-    #[Route('/salesProduct', name: 'app_salesProduct_list', methods: ['GET'])]
-    public function salesProduct_list(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
-    {
-        try {
-            // Siempre el negocio del usuario autenticado: esta ruta no recibe id_negocio por URL.
-            $list_salesProduct = $salesProduct_service->list_salesProduct($this->idNegocioUsuarioActual());
-            return $this->respuesta(200, $list_salesProduct, []);
-        } catch (\Throwable $th) {
-            //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
-            return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
-        }
-        // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
-        return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
-    }
-
     #[Route('/salesProduct', name: 'app_add_salesProduct', methods: ['POST'])]
     public function salesProduct_add(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
     {
@@ -49,8 +34,23 @@ class SalesProductController extends BaseController
 
         // Formatear la fecha al formato deseado (YYYY-MM-DD)
         $fechaFormateada = $fechaArgentina->format('Y-m-d H:i:s');
+
+        // Venta hecha sin conexión que se envía después: el front manda la hora real de
+        // la venta. Se acepta solo si es de los últimos 7 días y no es futura.
+        $fechaOffline = (string) $request->headers->get('X-Venta-Fecha', '');
+        if ($fechaOffline !== '') {
+            $f = \DateTime::createFromFormat('Y-m-d H:i:s', $fechaOffline, $zonaHorariaArgentina);
+            if ($f && $f <= $fechaArgentina && $f >= (clone $fechaArgentina)->modify('-7 days')) {
+                $fechaFormateada = $f->format('Y-m-d H:i:s');
+            }
+        }
+        $clave = (string) $request->headers->get('X-Venta-Clave', '');
+        $clave = preg_match('/^[A-Za-z0-9-]{8,64}$/', $clave) ? $clave : null;
         $idNegocioUsuario = $this->idNegocioUsuarioActual();
         foreach ($datos as $venta) {
+            if ($check = $this->sucursalPermitida($venta['sucursal'] ?? null)) {
+                return $check;
+            }
             $dto = new AddSalesProductDTO();
             $dto->setIdProduct($venta['id']);
             $dto->setSaleDay($fechaFormateada);
@@ -60,7 +60,8 @@ class SalesProductController extends BaseController
             // El id_negocio nunca se toma del body: siempre el del usuario autenticado.
             $dto->setIdNegocio((string) $idNegocioUsuario);
             $dto->setSucursal($venta['sucursal']);
-            $dto->setUsuario($venta['usuario']);
+            // Quién vendió sale del token, no del body.
+            $dto->setUsuario($this->idUsuarioActual());
             $this->createForm(AddSalesProductType::class, $dto);
             $errores = $this->obtener_validaciones($validator, $dto);
             if (count($errores) > 0) {
@@ -70,19 +71,19 @@ class SalesProductController extends BaseController
         }
 
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
         if (!$errores) {
             try {
-                $sales_product = $salesProduct_service->save_salesProduct($datosDto);
+                $sales_product = $salesProduct_service->save_salesProduct($datosDto, $clave);
+                if ($sales_product === 'duplicada') {
+                    return $this->respuesta(200, [true], [], 200, ['X-Venta-Duplicada' => '1']);
+                }
                 return $this->respuesta(200, [$sales_product], []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
-            // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, $datosDto, ['Ocurrió un error desconocido.'], 400);
@@ -103,7 +104,6 @@ class SalesProductController extends BaseController
         }
 
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -119,10 +119,8 @@ class SalesProductController extends BaseController
                 $sales_product_delete = $salesProduct_service->delete_salesProduct($dto);
                 return $this->respuesta(200, [$sales_product_delete], []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
             }
-            // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
@@ -178,7 +176,6 @@ class SalesProductController extends BaseController
         }
 
         if (count($errores) > 0) {
-            //$this->errores_to_log($errores, $log, 'app_agregar_productos');
             return $this->respuesta(400, [], $errores, 400);
         }
 
@@ -194,10 +191,8 @@ class SalesProductController extends BaseController
                 $sales_product_delete = $salesProduct_service->register_salesProduct($dto);
                 return $this->respuesta(200, [$sales_product_delete], []);
             } catch (\Throwable $th) {
-                //$log::get_log()->error('ENDPOINT: registrar_email ERROR: ' . $th->getMessage());
                 return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
             }
-            // $log::get_log()->error('ENDPOINT: registrar_email ERROR: Ocurrió un error desconocido.');
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);

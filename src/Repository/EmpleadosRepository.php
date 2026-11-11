@@ -42,7 +42,7 @@ class EmpleadosRepository extends BaseRepository
   }
   public function crearEmpleado(EmpleadoDTO $dto): ?array
   {
-    $rol = $dto->getRol() == 'titular' ? '["ROLE_TITULAR"]' : '["ROLE_USER"]';
+    $rol = self::rolBaseDeDatos($dto->getRol()) ?? '["ROLE_USER"]';
     $sql = 'INSERT INTO user (name, email,password, role, id_negocio, eliminado) 
                 VALUES (:name, :email,:password ,:role, :id_negocio, 0)';
 
@@ -71,16 +71,33 @@ class EmpleadosRepository extends BaseRepository
   public function actualizarEmpleado(int $idEmpleado, EmpleadoDTO $dto): bool
   {
     $sql = 'UPDATE user 
-                SET name = :name, email = :email, role = :role 
+                SET name = :name, email = :email, role = COALESCE(:role, role)
                 WHERE id = :id AND id_negocio = :id_negocio AND (eliminado = 0 OR eliminado IS NULL)';
 
     $query = $this->get_bbdd()->prepare($sql);
     $query->bindValue(':name', $dto->getNombre());
     $query->bindValue(':email', $dto->getEmail());
-    $query->bindValue(':role', $dto->getRol() == 'Administrador' ? '["ROLE_TITULAR"]' : '["ROLE_USER"]');
+    // Si el PATCH no trae rol, se conserva el que tenía (antes lo pasaba a empleado).
+    $query->bindValue(':role', self::rolBaseDeDatos($dto->getRol()));
     $query->bindValue(':id', $idEmpleado, PDO::PARAM_INT);
     $query->bindValue(':id_negocio', $dto->getIdNegocio(), PDO::PARAM_INT);
 
     return $query->execute();
+  }
+
+  /**
+   * Traduce el rol que manda el front al formato de la tabla user.
+   * El front manda "Administrador" o "Empleado"; antes el alta solo reconocía
+   * "titular", así que un empleado nuevo marcado como Administrador quedaba
+   * como empleado común. Se aceptan los dos nombres para el administrador.
+   * Devuelve null si no vino rol.
+   */
+  public static function rolBaseDeDatos(?string $rol): ?string
+  {
+    if ($rol === null || trim($rol) === '') {
+      return null;
+    }
+    $rol = mb_strtolower(trim($rol));
+    return in_array($rol, ['administrador', 'titular'], true) ? '["ROLE_TITULAR"]' : '["ROLE_USER"]';
   }
 }

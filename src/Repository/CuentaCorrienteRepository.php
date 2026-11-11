@@ -26,18 +26,20 @@ class CuentaCorrienteRepository extends BaseRepository
         LEFT JOIN (
             SELECT id_persona, SUM(precio_original) AS total
             FROM ctacte
-            WHERE anulado = 0
+            WHERE anulado = 0 AND id_negocio = :id_negocio_deuda
             GROUP BY id_persona
         ) deuda_agg ON deuda_agg.id_persona = clientes.id
         LEFT JOIN (
             SELECT ctacte.id_persona, SUM(pagos.entrega) AS total
             FROM pagos
             INNER JOIN ctacte ON ctacte.id = pagos.id_ctacte
-            WHERE pagos.anulado = 0
+            WHERE pagos.anulado = 0 AND ctacte.id_negocio = :id_negocio_pagos
             GROUP BY ctacte.id_persona
         ) pagos_agg ON pagos_agg.id_persona = clientes.id
         WHERE clientes.id_negocio = :id_negocio');
         $query->bindParam(':id_negocio', $idNegocio);
+        $query->bindParam(':id_negocio_deuda', $idNegocio);
+        $query->bindParam(':id_negocio_pagos', $idNegocio);
         $query->execute();
         $query->setFetchMode(PDO::FETCH_ASSOC);
         $expenses = $query->fetchAll();
@@ -70,20 +72,24 @@ class CuentaCorrienteRepository extends BaseRepository
                 LEFT JOIN (
                     SELECT id_persona, SUM(precio_original) AS total
                     FROM ctacte
-                    WHERE anulado = 0
+                    WHERE anulado = 0 AND id_negocio = :id_negocio_deuda
                     GROUP BY id_persona
                 ) deuda_agg ON deuda_agg.id_persona = clientes.id
                 LEFT JOIN (
                     SELECT ctacte.id_persona, SUM(pagos.entrega) AS total
                     FROM pagos
                     INNER JOIN ctacte ON ctacte.id = pagos.id_ctacte
-                    WHERE pagos.anulado = 0
+                    WHERE pagos.anulado = 0 AND ctacte.id_negocio = :id_negocio_pagos
                     GROUP BY ctacte.id_persona
                 ) pagos_agg ON pagos_agg.id_persona = clientes.id
                 WHERE clientes.id_negocio = :id_negocio
             ) AS cuentas
             WHERE deuda > pagos');
+        // Las sumas se filtran por negocio adentro: antes agregaban ctacte y pagos de
+        // todos los negocios y recién después se quedaban con los clientes de este.
         $query->bindParam(':id_negocio', $idNegocio);
+        $query->bindParam(':id_negocio_deuda', $idNegocio);
+        $query->bindParam(':id_negocio_pagos', $idNegocio);
         $query->execute();
         $query->setFetchMode(PDO::FETCH_ASSOC);
         $expenses = $query->fetchAll();

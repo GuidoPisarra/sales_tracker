@@ -1,0 +1,24 @@
+framework:
+    rate_limiter:
+        # Altas de cuenta por IP.
+        registro:
+            policy: sliding_window
+            limit: 5
+            interval: '1 hour'
+        # Pedidos de mail (verificación, olvidé mi clave) por IP.
+        mails_cuenta:
+            policy: sliding_window
+            limit: 5
+            interval: '15 minutes'
+        # Ingresos con Google por IP.
+        google:
+            policy: sliding_window
+            limit: 20
+            interval: '1 minute'
+
+when@test:
+    framework:
+        rate_limiter:
+            registro: { policy: sliding_window, limit: 10000, interval: '1 hour' }
+            mails_cuenta: { policy: sliding_window, limit: 10000, interval: '15 minutes' }
+            google: { policy: sliding_window, limit: 10000, interval: '1 minute' }

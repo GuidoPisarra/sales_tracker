@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Model\Usuario;
 use App\Service\AppLogs;
+use App\Tenant\TenantContext;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -11,6 +12,30 @@ use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class BaseController extends AbstractController
 {
+    public static function getSubscribedServices(): array
+    {
+        return array_merge(parent::getSubscribedServices(), [
+            TenantContext::class => TenantContext::class,
+        ]);
+    }
+
+    protected function tenant(): TenantContext
+    {
+        return $this->container->get(TenantContext::class);
+    }
+
+    /**
+     * Verifica que la sucursal pedida (número de sucursal) sea del negocio del usuario.
+     * Devuelve null si está autorizado; si no, una JsonResponse 403 para retornar.
+     */
+    protected function sucursalPermitida($sucursal): ?JsonResponse
+    {
+        if ($this->tenant()->sucursalPermitida($sucursal)) {
+            return null;
+        }
+        return $this->respuesta(403, [], ['No tiene permisos sobre esta sucursal.'], 403);
+    }
+
     /**
      * Devuelve el id_negocio del usuario autenticado por JWT (nunca el que mande el cliente).
      */
@@ -38,6 +63,34 @@ class BaseController extends AbstractController
             return $this->respuesta(403, [], ['No tiene permisos sobre este negocio.'], 403);
         }
         return null;
+    }
+
+    /**
+     * true si el usuario autenticado es el administrador del negocio (ROLE_TITULAR).
+     * El rol se lee del campo "role" de la tabla user (getRoles() de Symfony siempre
+     * devuelve ROLE_USER, así que no sirve para esto).
+     */
+    protected function esTitular(): bool
+    {
+        $usuario = $this->getUser();
+        if (!$usuario instanceof Usuario) {
+            return false;
+        }
+        $roles = json_decode((string) $usuario->get_role(), true);
+        return is_array($roles) && in_array('ROLE_TITULAR', $roles, true);
+    }
+
+    /**
+     * Para endpoints exclusivos del administrador. Antes solo los protegía el
+     * TitularGuard del front, así que un empleado podía llamarlos directo con su token.
+     * Devuelve null si está autorizado; si no, una JsonResponse 403 para retornar.
+     */
+    protected function soloTitular(): ?JsonResponse
+    {
+        if ($this->esTitular()) {
+            return null;
+        }
+        return $this->respuesta(403, [], ['Solo el administrador puede hacer esta acción.'], 403);
     }
 
     public function request_to_json(Request $request)

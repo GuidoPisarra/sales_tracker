@@ -8,20 +8,6 @@ use PDO;
 
 class SalesProductRepository extends BaseRepository
 {
-    public function list_salesProduct(int $id_negocio): ?array
-    {
-        $query = $this->get_bbdd()->prepare('SELECT id id, description description,price price,id_sucursal id_sucursal, date_expense date_expense FROM expense WHERE id_negocio = :id_negocio');
-        $query->bindParam(':id_negocio', $id_negocio);
-        $query->execute();
-        $query->setFetchMode(PDO::FETCH_ASSOC);
-        $salesProduct = $query->fetchAll();
-
-        if (!$salesProduct) {
-            return null;
-        }
-
-        return $salesProduct;
-    }
 
     /**
      * Negocio real dueño de una venta (sales_product), para validar antes de borrarla/registrarla.
@@ -40,7 +26,7 @@ class SalesProductRepository extends BaseRepository
      * corresponde) va en una sola transacción: si algo falla a mitad de camino (p. ej. no hay
      * stock de un producto), se revierte todo en vez de dejar ventas parciales ya guardadas.
      */
-    public function save_salesProduct(array $datosDto): ?bool
+    public function save_salesProduct(array $datosDto, ?string $clave = null)
     {
         $active = 0;
         $register = 0;
@@ -48,13 +34,40 @@ class SalesProductRepository extends BaseRepository
         $pdo = $this->get_bbdd();
         $pdo->beginTransaction();
         try {
+            // Venta con clave (la manda el front, p. ej. al reintentar una venta hecha sin
+            // conexión): si esa clave ya está, la venta ya se guardó y no se duplica.
+            if ($clave !== null && $datosDto) {
+                try {
+                    $pdo->prepare('INSERT INTO venta_clave (id_negocio, clave) VALUES (:n, :c)')
+                        ->execute([':n' => $datosDto[0]->to_array()['id_negocio'], ':c' => $clave]);
+                } catch (\PDOException $e) {
+                    $codigo = (int) ($e->errorInfo[1] ?? 0);
+                    if ($codigo === 1062) {
+                        $pdo->rollBack();
+                        return 'duplicada';
+                    }
+                    if ($codigo !== 1146) { // 1146: base sin la migración 0003, se sigue sin clave.
+                        throw $e;
+                    }
+                }
+            }
+
             //insertar en sales y quedarme con el primer id (mismo criterio que antes)
             $idSALE = null;
+
+            // Se preparan una sola vez y se reusan por cada producto del carrito.
+            $querySale = $pdo->prepare('INSERT INTO sales (id_product, id_negocio) VALUES (:idProduct, :idNegocio)');
+            $query = $pdo->prepare('INSERT INTO sales_product
+                    (id_sale, id_product, quantity, price, sale_product_date, type_payment, active, register,id_negocio,sucursal, id_persona,usuario)
+                    VALUES (:idSale, :idProduct, :quantity, :price, :saleDay, :typePayment, :active, :register, :id_negocio, :sucursal, :id_persona,:usuario)');
+            $queryStock = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id AND p.id_negocio = :id_negocio AND p.quantity >= :quantityMinima');
+            $queryCtaCte = $pdo->prepare('INSERT INTO ctacte
+                        (id_producto, id_sale, id_sale_product, id_persona, precio_original, precio_actual, id_negocio, sucursal, fecha_venta)
+                        VALUES (:idProduct, :idSale, :idSaleProduct, :id_persona, :priceOriginal, :priceActual, :id_negocio, :sucursal, :saleDay)');
 
             foreach ($datosDto as $venta) {
                 $newSale = $venta->to_array();
 
-                $querySale = $pdo->prepare('INSERT INTO sales (id_product, id_negocio) VALUES (:idProduct, :idNegocio)');
                 $querySale->bindParam(':idProduct', $newSale["idProduct"]);
                 $querySale->bindParam(':idNegocio', $newSale["id_negocio"]);
                 if (!$querySale->execute()) {
@@ -63,10 +76,6 @@ class SalesProductRepository extends BaseRepository
                 if ($idSALE === null) {
                     $idSALE = (int) $pdo->lastInsertId();
                 }
-
-                $query = $pdo->prepare('INSERT INTO sales_product
-                    (id_sale, id_product, quantity, price, sale_product_date, type_payment, active, register,id_negocio,sucursal, id_persona,usuario)
-                    VALUES (:idSale, :idProduct, :quantity, :price, :saleDay, :typePayment, :active, :register, :id_negocio, :sucursal, :id_persona,:usuario)');
 
                 $query->bindParam(':idSale', $idSALE);
                 $query->bindParam(':idProduct', $newSale["idProduct"]);
@@ -88,7 +97,6 @@ class SalesProductRepository extends BaseRepository
 
                 // Solo descuenta si el producto es del negocio del usuario y hay stock
                 // suficiente; si no afecta ninguna fila, es por una de las dos razones.
-                $queryStock = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id AND p.id_negocio = :id_negocio AND p.quantity >= :quantityMinima');
                 $queryStock->bindParam(':id', $newSale["idProduct"]);
                 $queryStock->bindParam(':id_negocio', $newSale["id_negocio"]);
                 $queryStock->bindParam(':quantity', $newSale["quantity"]);
@@ -99,10 +107,6 @@ class SalesProductRepository extends BaseRepository
                 }
 
                 if ($newSale["typePayment"] === 'Cta Cte') {
-                    $queryCtaCte = $pdo->prepare('INSERT INTO ctacte
-                        (id_producto, id_sale, id_sale_product, id_persona, precio_original, precio_actual, id_negocio, sucursal, fecha_venta)
-                        VALUES (:idProduct, :idSale, :idSaleProduct, :id_persona, :priceOriginal, :priceActual, :id_negocio, :sucursal, :saleDay)');
-
                     $queryCtaCte->bindParam(':idProduct', $newSale["idProduct"]);
                     $queryCtaCte->bindParam(':idSale', $idSALE);
                     $queryCtaCte->bindParam(':idSaleProduct', $idSALEPRODUCT);

@@ -9,9 +9,7 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 
-/**
- * @Route("/api/empleados")
- */
+#[Route('/api/empleados')]
 class EmpleadosController extends BaseController
 {
   private EmpleadosService $empleadosService;
@@ -21,11 +19,14 @@ class EmpleadosController extends BaseController
     $this->empleadosService = $empleadosService;
   }
 
-  /**
-   * @Route("/{id_negocio}", name="app_empleados_list", methods={"GET"})
-   */
-  public function listar(int $id_negocio): JsonResponse
+  #[Route('', name: 'app_empleados_list_token', defaults: ['id_negocio' => null], methods: ['GET'])]
+  #[Route('/{id_negocio}', name: 'app_empleados_list', requirements: ['id_negocio' => '\d+'], methods: ['GET'])]
+  public function listar(?int $id_negocio): JsonResponse
   {
+      $id_negocio ??= $this->idNegocioUsuarioActual();
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     if ($check = $this->negocioPermitido($id_negocio)) {
       return $check;
     }
@@ -42,11 +43,12 @@ class EmpleadosController extends BaseController
     }
   }
 
-  /**
-   * @Route("/{id_employee}", name="app_delete_employee", methods={"DELETE"})
-   */
+  #[Route('/{id_employee}', name: 'app_delete_employee', methods: ['DELETE'])]
   public function delete_employee(int $id_employee): JsonResponse
   {
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     $idNegocioReal = $this->empleadosService->obtenerIdNegocio($id_employee);
     if ($idNegocioReal === null) {
       return $this->respuesta(404, [], ['Empleado no encontrado'], 404);
@@ -67,11 +69,12 @@ class EmpleadosController extends BaseController
     }
   }
 
-  /**
-   * @Route("/nuevo", name="app_empleado_crear", methods={"POST"})
-   */
+  #[Route('/nuevo', name: 'app_empleado_crear', methods: ['POST'])]
   public function crear(Request $request): JsonResponse
   {
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     try {
       $data = json_decode($request->getContent(), true) ?? [];
       $dto = new EmpleadoDTO();
@@ -98,11 +101,12 @@ class EmpleadosController extends BaseController
       return $this->respuesta(500, [], ['Error interno al crear el empleado']);
     }
   }
-  /**
-   * @Route("/{id_employee}", name="app_empleado_actualizar", methods={"PATCH"})
-   */
+  #[Route('/{id_employee}', name: 'app_empleado_actualizar', methods: ['PATCH'])]
   public function actualizar(int $id_employee, Request $request): JsonResponse
   {
+    if ($check = $this->soloTitular()) {
+      return $check;
+    }
     $idNegocioReal = $this->empleadosService->obtenerIdNegocio($id_employee);
     if ($idNegocioReal === null) {
       return $this->respuesta(404, [], ['Empleado no encontrado'], 404);
@@ -139,7 +143,8 @@ class EmpleadosController extends BaseController
 
       return $this->respuesta(200, ['Empleado actualizado correctamente'], []);
     } catch (\Throwable $e) {
-      return $this->respuesta(500, [], ['Error interno al actualizar el empleado: ' . $e->getMessage()]);
+      error_log('app_empleado_actualizar: ' . $e->getMessage());
+      return $this->respuesta(500, [], ['Error interno al actualizar el empleado']);
     }
   }
 }

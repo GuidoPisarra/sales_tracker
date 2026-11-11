@@ -2,7 +2,6 @@
 
 namespace App\Service;
 
-use App\DTO\Usuario\RegistrarUsuarioDTO;
 use App\Model\Usuario;
 use App\Repository\UsuarioRepository;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
@@ -41,22 +40,6 @@ class ServicioUsuario
     protected function get_jwt_manager(): JWTTokenManagerInterface
     {
         return $this->jwt_manager;
-    }
-
-    public function registrar_usuario(RegistrarUsuarioDTO $usuario)
-    {
-
-        $findUser = $this->rep_usuario->buscar_usuario($usuario);
-        if ($findUser !== null) {
-            var_dump("Ya existe ", $usuario->getEmail());
-        } else {
-            $user = new Usuario();
-            $user->set_password($usuario->getPassword());
-            $user->set_password($this->encriptar_contraseña($user));
-            $usuario->setPassword($user->get_password());
-            $usuario->setRole($user->get_roles());
-            $this->rep_usuario->registrar_usuario($usuario);
-        }
     }
 
     public function get_rol_id_usuario(string $email)
