@@ -56,6 +56,9 @@ class EmpleadosController extends BaseController
     if ($check = $this->negocioPermitido($idNegocioReal)) {
       return $check;
     }
+    if ($motivo = $this->empleadosService->motivoNoEliminar($id_employee, $idNegocioReal, $this->idUsuarioActual())) {
+      return $this->respuesta(409, [], [$motivo], 409);
+    }
 
     try {
       $ok = $this->empleadosService->delete_employee($id_employee);

@@ -26,6 +26,23 @@ class EmpleadosService
     $this->jwt_manager = $jwt_manager;
   }
 
+  /**
+   * Motivo por el que no se puede eliminar ese usuario, o null si se puede.
+   * Nunca se borra el propio usuario ni el último administrador del negocio
+   * (el negocio quedaría sin nadie que pueda entrar a administrarlo).
+   */
+  public function motivoNoEliminar(int $idEmpleado, int $idNegocio, ?int $idUsuarioActual): ?string
+  {
+    if ($idUsuarioActual !== null && $idEmpleado === $idUsuarioActual) {
+      return 'No podés eliminar tu propio usuario.';
+    }
+    if ($this->empleadosRepository->esTitularActivo($idEmpleado)
+      && $this->empleadosRepository->contarTitularesActivos($idNegocio) <= 1) {
+      return 'No podés eliminar al único administrador del negocio.';
+    }
+    return null;
+  }
+
   public function obtenerIdNegocio(int $idEmpleado): ?int
   {
     return $this->empleadosRepository->obtenerIdNegocio($idEmpleado);

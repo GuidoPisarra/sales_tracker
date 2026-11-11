@@ -34,6 +34,21 @@ class EmpleadosRepository extends BaseRepository
     return $fila ? (int) $fila['id_negocio'] : null;
   }
 
+  /** true si el usuario es administrador (ROLE_TITULAR) y no está eliminado. */
+  public function esTitularActivo(int $idUsuario): bool
+  {
+    $query = $this->get_bbdd()->prepare("SELECT COUNT(*) FROM user WHERE id = :id AND role LIKE '%ROLE_TITULAR%' AND (eliminado = 0 OR eliminado IS NULL)");
+    $query->execute([':id' => $idUsuario]);
+    return (int) $query->fetchColumn() > 0;
+  }
+
+  public function contarTitularesActivos(int $idNegocio): int
+  {
+    $query = $this->get_bbdd()->prepare("SELECT COUNT(*) FROM user WHERE id_negocio = :n AND role LIKE '%ROLE_TITULAR%' AND (eliminado = 0 OR eliminado IS NULL)");
+    $query->execute([':n' => $idNegocio]);
+    return (int) $query->fetchColumn();
+  }
+
   public function delete_employee(int $id_employee): bool
   {
     $query = $this->get_bbdd()->prepare('UPDATE user SET eliminado = 1 WHERE  id = :id_employee');

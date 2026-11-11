@@ -47,7 +47,12 @@ class SalesProductController extends BaseController
         $clave = (string) $request->headers->get('X-Venta-Clave', '');
         $clave = preg_match('/^[A-Za-z0-9-]{8,64}$/', $clave) ? $clave : null;
         $idNegocioUsuario = $this->idNegocioUsuarioActual();
+        // Venta sin conexión (trae X-Venta-Fecha): ya ocurrió, así que no se rechaza por stock.
+        $sinConexion = $fechaOffline !== '';
+        // Productos que el vendedor confirmó "vender igual" aunque el sistema dijera que no había stock.
+        $forzarStock = [];
         foreach ($datos as $venta) {
+            $forzarStock[] = !empty($venta['sinStock']);
             if ($check = $this->sucursalPermitida($venta['sucursal'] ?? null)) {
                 return $check;
             }
@@ -76,17 +81,43 @@ class SalesProductController extends BaseController
 
         if (!$errores) {
             try {
-                $sales_product = $salesProduct_service->save_salesProduct($datosDto, $clave);
+                $sales_product = $salesProduct_service->save_salesProduct($datosDto, $clave, $forzarStock, $sinConexion);
                 if ($sales_product === 'duplicada') {
                     return $this->respuesta(200, [true], [], 200, ['X-Venta-Duplicada' => '1']);
                 }
-                return $this->respuesta(200, [$sales_product], []);
+                // datos[0] sigue siendo true (el front lo usa así); datos[1] lista lo que faltó.
+                $faltantes = $salesProduct_service->ultimosFaltantes();
+                return $this->respuesta(200, $faltantes ? [$sales_product, ['faltantes' => $faltantes]] : [$sales_product], []);
             } catch (\Throwable $th) {
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, $datosDto, ['Ocurrió un error desconocido.'], 400);
+    }
+
+    /** Productos vendidos sin stock que el administrador todavía no revisó. */
+    #[Route('/faltantes', name: 'app_salesProduct_faltantes', methods: ['GET'])]
+    public function faltantes(Request $request, SalesProductService $salesProduct_service): JsonResponse
+    {
+        if (!$this->esTitular()) {
+            return $this->respuesta(403, [], ['Solo el administrador puede ver el stock a revisar.'], 403);
+        }
+        $todos = $request->query->get('todos') === '1';
+        return $this->respuesta(200, $salesProduct_service->faltantes((int) $this->idNegocioUsuarioActual(), $todos), []);
+    }
+
+    #[Route('/faltantes/revisados', name: 'app_salesProduct_faltantes_revisados', methods: ['POST'])]
+    public function faltantesRevisados(Request $request, SalesProductService $salesProduct_service): JsonResponse
+    {
+        if (!$this->esTitular()) {
+            return $this->respuesta(403, [], ['Solo el administrador puede marcar el stock como revisado.'], 403);
+        }
+        $this->request_to_json($request);
+        $ids = $request->request->all()['ids'] ?? [];
+        $ids = is_array($ids) ? $ids : [];
+        $marcados = $salesProduct_service->marcarFaltantesRevisados((int) $this->idNegocioUsuarioActual(), $ids);
+        return $this->respuesta(200, ['marcados' => $marcados], []);
     }
 
     #[Route('/salesProduct/delete', name: 'app_delete_salesProduct', methods: ['POST'])]
