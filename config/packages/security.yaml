@@ -36,4 +36,7 @@ security:
         - { path: ^/api/usuario/(google|olvide-clave|restablecer-clave), roles: PUBLIC_ACCESS }
         - { path: ^/api/planes$, roles: PUBLIC_ACCESS }
         - { path: ^/api/webhooks, roles: PUBLIC_ACCESS }
+        # El celular que escanea para Caja no tiene sesión: usa la clave que recibe al vincularse.
+        - { path: ^/api/escaneo/movil/, roles: PUBLIC_ACCESS }
+        - { path: ^/api/publico/, roles: PUBLIC_ACCESS }
         - { path: ^/api, roles: IS_AUTHENTICATED_FULLY }
