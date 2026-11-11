@@ -25,6 +25,11 @@ framework:
             policy: sliding_window
             limit: 300
             interval: '1 minute'
+        # Catálogo online público, por IP.
+        catalogo_publico:
+            policy: sliding_window
+            limit: 120
+            interval: '1 minute'
 
 when@test:
     framework:
@@ -34,3 +39,4 @@ when@test:
             google: { policy: sliding_window, limit: 10000, interval: '1 minute' }
             escaneo_vincular: { policy: sliding_window, limit: 10000, interval: '15 minutes' }
             escaneo_codigo: { policy: sliding_window, limit: 10000, interval: '1 minute' }
+            catalogo_publico: { policy: sliding_window, limit: 10000, interval: '1 minute' }
