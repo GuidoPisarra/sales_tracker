@@ -58,14 +58,14 @@
         }
     },
     "scripts": {
-        "auto-scripts": [
+        "limpiar-cache": [
             "php bin/console cache:clear"
         ],
         "post-install-cmd": [
-            "@auto-scripts"
+            "@limpiar-cache"
         ],
         "post-update-cmd": [
-            "@auto-scripts"
+            "@limpiar-cache"
         ],
         "test": "phpunit"
     },
