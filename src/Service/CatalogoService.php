@@ -20,9 +20,10 @@ class CatalogoService
     }
 
     /** Configuración del catálogo para la pantalla del administrador. */
-    public function config(int $idNegocio): array
+    public function config(int $idNegocio, array $sucursales = []): array
     {
         $c = $this->repo->config($idNegocio);
+        $c['catalogo_sucursal'] = self::sucursalEfectiva((int) $c['catalogo_sucursal'], $sucursales);
         return [
             'activo' => (int) $c['catalogo_activo'] === 1,
             'slug' => $c['catalogo_slug'],
@@ -45,16 +46,31 @@ class CatalogoService
     }
 
     /**
-     * Guarda la configuración. $sucursalValida dice si la sucursal es del negocio.
+     * Si la sucursal guardada no es del negocio (por ejemplo el 1 por defecto en un
+     * negocio cuyas sucursales tienen otro número), usa la primera del negocio.
+     *
+     * @param int[] $sucursales sucursales del negocio
+     */
+    private static function sucursalEfectiva(int $guardada, array $sucursales): int
+    {
+        if ($sucursales === [] || in_array($guardada, $sucursales, true)) {
+            return $guardada;
+        }
+        return min($sucursales);
+    }
+
+    /**
+     * Guarda la configuración. $sucursales son las sucursales del negocio.
+     * @param int[] $sucursales
      * @return array|string la configuración guardada, o un mensaje de error
      */
-    public function guardar(int $idNegocio, array $d, callable $sucursalValida)
+    public function guardar(int $idNegocio, array $d, array $sucursales)
     {
         $actual = $this->repo->config($idNegocio);
         $slug = array_key_exists('slug', $d) ? self::slugDesde((string) $d['slug']) : (string) $actual['catalogo_slug'];
         $activo = array_key_exists('activo', $d) ? !empty($d['activo']) : (int) $actual['catalogo_activo'] === 1;
         $whatsapp = array_key_exists('whatsapp', $d) ? preg_replace('/\D+/', '', (string) $d['whatsapp']) : (string) $actual['catalogo_whatsapp'];
-        $sucursal = array_key_exists('sucursal', $d) ? (int) $d['sucursal'] : (int) $actual['catalogo_sucursal'];
+        $sucursal = array_key_exists('sucursal', $d) ? (int) $d['sucursal'] : self::sucursalEfectiva((int) $actual['catalogo_sucursal'], $sucursales);
 
         if ($slug !== '' && (!preg_match(self::SLUG, $slug) || in_array($slug, self::RESERVADOS, true))) {
             return 'El link tiene que tener entre 3 y 40 letras, números o guiones.';
@@ -68,7 +84,7 @@ class CatalogoService
         if ($activo && $whatsapp === '') {
             return 'Falta el número de WhatsApp donde te llegan los pedidos.';
         }
-        if (!$sucursalValida($sucursal)) {
+        if (!in_array($sucursal, $sucursales, true)) {
             return 'Esa sucursal no es de tu negocio.';
         }
         $duenio = $slug !== '' ? $this->repo->negocioDelSlug($slug) : null;
@@ -89,7 +105,7 @@ class CatalogoService
             'catalogo_mostrar_stock' => (array_key_exists('mostrar_stock', $d) ? !empty($d['mostrar_stock']) : (int) $actual['catalogo_mostrar_stock'] === 1) ? 1 : 0,
             'catalogo_sin_stock' => (array_key_exists('sin_stock', $d) ? !empty($d['sin_stock']) : (int) $actual['catalogo_sin_stock'] === 1) ? 1 : 0,
         ]);
-        return $this->config($idNegocio);
+        return $this->config($idNegocio, $sucursales);
     }
 
     /** Catálogo público por slug, o null si no existe o está apagado. */

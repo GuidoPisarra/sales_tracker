@@ -91,4 +91,20 @@ class CatalogoTest extends KontiaTestCase
         [$estado] = $this->pedir('POST', '/api/catalogo/config', ['sucursal' => 9], $this->token);
         $this->assertSame(409, $estado);
     }
+
+    /** Un negocio cuyas sucursales no empiezan en 1 usa su primera sucursal por defecto. */
+    public function testSucursalPorDefectoEsLaDelNegocio(): void
+    {
+        $this->crearNegocio(3, [4, 7]);
+        $this->crearUsuario('tres@test.com', 3);
+        $token = $this->tokenPara('tres@test.com');
+
+        [$estado, $r] = $this->pedir('GET', '/api/catalogo/config', null, $token);
+        $this->assertSame(200, $estado);
+        $this->assertSame(4, $r['datos']['sucursal']);
+
+        [$estado, $r] = $this->pedir('POST', '/api/catalogo/config', ['activo' => true, 'slug' => 'tienda-tres', 'whatsapp' => '5491122334455'], $token);
+        $this->assertSame(200, $estado);
+        $this->assertSame(4, $r['datos']['sucursal']);
+    }
 }

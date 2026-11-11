@@ -20,7 +20,7 @@ class CatalogoController extends BaseController
         if ($check = $this->soloTitular()) {
             return $check;
         }
-        return $this->respuesta(200, $catalogo->config((int) $this->idNegocioUsuarioActual()), []);
+        return $this->respuesta(200, $catalogo->config((int) $this->idNegocioUsuarioActual(), $this->tenant()->sucursales()), []);
     }
 
     #[Route('/api/catalogo/config', name: 'app_catalogo_guardar', methods: ['POST'])]
@@ -30,7 +30,7 @@ class CatalogoController extends BaseController
             return $check;
         }
         $d = json_decode($request->getContent(), true) ?: [];
-        $r = $catalogo->guardar((int) $this->idNegocioUsuarioActual(), $d, fn (int $s) => $this->tenant()->sucursalPermitida($s));
+        $r = $catalogo->guardar((int) $this->idNegocioUsuarioActual(), $d, $this->tenant()->sucursales());
         if (is_string($r)) {
             return $this->respuesta(409, [], [$r], 409);
         }
