@@ -61,14 +61,60 @@ Crear un widget en Cloudflare Turnstile y completar `TURNSTILE_SITE_KEY` y
 
 ## 5. Mercado Pago
 
-1. En https://www.mercadopago.com.ar/developers/panel crear una aplicación
-   y copiar el **Access Token** de producción a `MP_ACCESS_TOKEN`
-   (para probar, usar el de prueba y usuarios de prueba).
-2. En la aplicación > Webhooks, configurar la URL
-   `https://www.ventas-xpress.com.ar/api/webhooks/mercadopago` con los eventos
-   **Planes y suscripciones** (`subscription_preapproval` y
-   `subscription_authorized_payment`). Copiar la clave secreta a `MP_WEBHOOK_SECRET`.
-3. `MP_BACK_URL` es adonde vuelve el usuario después de pagar (la pantalla Mi plan del front).
+### 5.1 Credenciales
+
+1. Entrar a https://www.mercadopago.com.ar/developers/panel con la cuenta que
+   va a **cobrar** y crear una aplicación ("Pagos online", producto
+   **Suscripciones**).
+2. En la aplicación > **Credenciales de producción**: completar los datos del
+   negocio (rubro, sitio web `https://kontia-app.vercel.app`) para activarlas y
+   copiar el **Access Token** (`APP_USR-...`) a `MP_ACCESS_TOKEN`.
+   Las credenciales de prueba (`TEST-...`) solo sirven con usuarios de prueba.
+
+### 5.2 Webhook
+
+1. En la aplicación > **Webhooks** > Configurar notificaciones > **Modo productivo**:
+   - URL: `https://www.ventas-xpress.com.ar/api/webhooks/mercadopago`
+   - Eventos: **Planes y suscripciones** (`subscription_preapproval` y
+     `subscription_authorized_payment`).
+2. Guardar y copiar la **clave secreta** que muestra a `MP_WEBHOOK_SECRET`.
+3. Botón "Simular notificación": como el id es de mentira, el back responde
+   **500** (firma bien, pero Mercado Pago no conoce ese id). Un **401** quiere
+   decir que la clave secreta no coincide.
+
+### 5.3 Variables en el VPS
+
+```
+MP_ACCESS_TOKEN=APP_USR-...
+MP_WEBHOOK_SECRET=...
+MP_BACK_URL=https://kontia-app.vercel.app/mi-plan
+```
+
+Después de editar el `.env`:
+
+```
+APP_ENV=prod php composer.phar dump-env prod
+APP_ENV=prod php bin/console cache:clear
+chown -R www-data:www-data var
+APP_ENV=prod php bin/console app:mp:verificar
+```
+
+`app:mp:verificar` muestra qué variables faltan y con qué cuenta de Mercado
+Pago quedó conectado el Access Token.
+
+### 5.4 Prueba real
+
+- No se puede pagar con la misma cuenta que cobra: usar otra cuenta de Mercado
+  Pago (un familiar, otro email).
+- Registrar un comercio de prueba en la web, ir a **Mi plan**, elegir Starter.
+  Si la cuenta de Mercado Pago tiene otro email que el de Kontia, escribirlo en
+  el cuadro que aparece (Mercado Pago solo deja pagar con ese email).
+- Al volver, Mi plan dice "esperando la confirmación"; en uno o dos minutos el
+  webhook deja el plan **activo** y llega el mail a `ADMIN_EMAILS`.
+- Después cancelar desde Mi plan y devolver el cobro desde la actividad de
+  Mercado Pago.
+- Si algo falla, mirar `var/log` / el log de errores de Apache (`Webhook MP` y
+  `Checkout MP`) y la tabla `webhook_evento`.
 
 El cobro solo se ofrece en la web. La app Android muestra el estado del plan
 pero no tiene botón de pago (Google Play exige su propio sistema de cobro para
@@ -101,7 +147,7 @@ Para los backups, crear `scripts/backup.conf` (no se sube al repo) con
 | POST `/api/usuario/google` | público | Entra o crea la cuenta con Google |
 | GET `/api/planes` | público | Planes a la venta |
 | GET `/api/suscripcion` | logueado | Mi plan: estado, uso, planes y pagos |
-| POST `/api/suscripcion/checkout` | titular | Link al checkout de Mercado Pago |
+| POST `/api/suscripcion/checkout` | titular | Link al checkout de Mercado Pago (`plan`, `email_pago` opcional) |
 | POST `/api/suscripcion/cancelar` | titular | Cancela el débito automático |
 | POST `/api/webhooks/mercadopago` | Mercado Pago | Avisos de suscripción y cobros |
 
