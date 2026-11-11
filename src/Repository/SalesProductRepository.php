@@ -26,8 +26,18 @@ class SalesProductRepository extends BaseRepository
      * corresponde) va en una sola transacción: si algo falla a mitad de camino (p. ej. no hay
      * stock de un producto), se revierte todo en vez de dejar ventas parciales ya guardadas.
      */
-    public function save_salesProduct(array $datosDto, ?string $clave = null)
+    /**
+     * @param bool[] $forzarStock por posición del carrito: true si el vendedor confirmó
+     *   "vender igual" aunque el sistema dijera que no había stock.
+     * @param bool $sinConexion la venta se hizo sin internet y llega después: ya ocurrió,
+     *   así que nunca se rechaza por stock.
+     *
+     * Con stock forzado (o sin conexión) el stock baja hasta 0, nunca a negativo, y lo que
+     * faltó se anota en stock_faltante (ver faltantes()). Las faltas quedan en $this->ultimosFaltantes.
+     */
+    public function save_salesProduct(array $datosDto, ?string $clave = null, array $forzarStock = [], bool $sinConexion = false)
     {
+        $this->ultimosFaltantes = [];
         $active = 0;
         $register = 0;
 
@@ -61,11 +71,13 @@ class SalesProductRepository extends BaseRepository
                     (id_sale, id_product, quantity, price, sale_product_date, type_payment, active, register,id_negocio,sucursal, id_persona,usuario)
                     VALUES (:idSale, :idProduct, :quantity, :price, :saleDay, :typePayment, :active, :register, :id_negocio, :sucursal, :id_persona,:usuario)');
             $queryStock = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id AND p.id_negocio = :id_negocio AND p.quantity >= :quantityMinima');
+            $queryStockActual = $pdo->prepare('SELECT quantity, description FROM product WHERE id = :id AND id_negocio = :id_negocio FOR UPDATE');
+            $queryStockHastaCero = $pdo->prepare('UPDATE product SET quantity = GREATEST(quantity - :quantity, 0) WHERE id = :id AND id_negocio = :id_negocio');
             $queryCtaCte = $pdo->prepare('INSERT INTO ctacte
                         (id_producto, id_sale, id_sale_product, id_persona, precio_original, precio_actual, id_negocio, sucursal, fecha_venta)
                         VALUES (:idProduct, :idSale, :idSaleProduct, :id_persona, :priceOriginal, :priceActual, :id_negocio, :sucursal, :saleDay)');
 
-            foreach ($datosDto as $venta) {
+            foreach ($datosDto as $posicion => $venta) {
                 $newSale = $venta->to_array();
 
                 $querySale->bindParam(':idProduct', $newSale["idProduct"]);
@@ -97,13 +109,17 @@ class SalesProductRepository extends BaseRepository
 
                 // Solo descuenta si el producto es del negocio del usuario y hay stock
                 // suficiente; si no afecta ninguna fila, es por una de las dos razones.
-                $queryStock->bindParam(':id', $newSale["idProduct"]);
-                $queryStock->bindParam(':id_negocio', $newSale["id_negocio"]);
-                $queryStock->bindParam(':quantity', $newSale["quantity"]);
-                $queryStock->bindParam(':quantityMinima', $newSale["quantity"]);
-                $queryStock->execute();
-                if ($queryStock->rowCount() === 0) {
-                    throw new \Exception('No se pudo descontar el stock: el producto no existe en este negocio o no hay stock suficiente.');
+                if ($sinConexion || !empty($forzarStock[$posicion])) {
+                    $this->descontarHastaCero($pdo, $queryStockActual, $queryStockHastaCero, $newSale, $idSALE, $sinConexion);
+                } else {
+                    $queryStock->bindParam(':id', $newSale["idProduct"]);
+                    $queryStock->bindParam(':id_negocio', $newSale["id_negocio"]);
+                    $queryStock->bindParam(':quantity', $newSale["quantity"]);
+                    $queryStock->bindParam(':quantityMinima', $newSale["quantity"]);
+                    $queryStock->execute();
+                    if ($queryStock->rowCount() === 0) {
+                        throw new \Exception('No se pudo descontar el stock: el producto no existe en este negocio o no hay stock suficiente.');
+                    }
                 }
 
                 if ($newSale["typePayment"] === 'Cta Cte') {
@@ -130,6 +146,129 @@ class SalesProductRepository extends BaseRepository
             }
             throw $th;
         }
+    }
+
+    /** Faltantes de stock de la última venta guardada: [{id_product, description, faltante}]. */
+    public array $ultimosFaltantes = [];
+
+    /**
+     * Descuenta el stock sin rechazar la venta: baja hasta 0 y anota lo que faltó.
+     * El producto tiene que existir y ser del negocio (eso sí se sigue validando).
+     */
+    private function descontarHastaCero(\PDO $pdo, \PDOStatement $actual, \PDOStatement $hastaCero, array $venta, int $idSale, bool $sinConexion): void
+    {
+        $actual->execute([':id' => $venta['idProduct'], ':id_negocio' => $venta['id_negocio']]);
+        $producto = $actual->fetch(\PDO::FETCH_ASSOC);
+        $actual->closeCursor();
+        if (!$producto) {
+            throw new \Exception('No se pudo descontar el stock: el producto no existe en este negocio.');
+        }
+        $stockAntes = (int) $producto['quantity'];
+        $cantidad = (int) $venta['quantity'];
+        $hastaCero->execute([':quantity' => $cantidad, ':id' => $venta['idProduct'], ':id_negocio' => $venta['id_negocio']]);
+
+        $faltante = $cantidad - max($stockAntes, 0);
+        if ($faltante <= 0) {
+            return;
+        }
+        try {
+            $pdo->prepare('INSERT INTO stock_faltante
+                    (id_negocio, sucursal, id_product, id_sale, cantidad_vendida, stock_antes, faltante, sin_conexion, usuario, fecha_venta)
+                    VALUES (:n, :s, :p, :v, :c, :antes, :f, :off, :u, :fecha)')
+                ->execute([
+                    ':n' => $venta['id_negocio'],
+                    ':s' => $venta['sucursal'] ?: 1,
+                    ':p' => $venta['idProduct'],
+                    ':v' => $idSale,
+                    ':c' => $cantidad,
+                    ':antes' => $stockAntes,
+                    ':f' => $faltante,
+                    ':off' => $sinConexion ? 1 : 0,
+                    ':u' => $venta['usuario'] ?: null,
+                    ':fecha' => $venta['saleDay'],
+                ]);
+        } catch (\PDOException $e) {
+            if ((int) ($e->errorInfo[1] ?? 0) !== 1146) { // 1146: base sin la migración 0007.
+                throw $e;
+            }
+        }
+        $this->ultimosFaltantes[] = [
+            'id_product' => (int) $venta['idProduct'],
+            'description' => (string) $producto['description'],
+            'faltante' => $faltante,
+        ];
+    }
+
+    /**
+     * Notificación para los administradores del negocio: se vendió algo que según el
+     * sistema no tenía stock. Si falla, la venta ya está guardada y no se toca.
+     */
+    public function avisarFaltantes(int $idNegocio, array $faltantes, bool $sinConexion): void
+    {
+        try {
+            $pdo = $this->get_bbdd();
+            $q = $pdo->prepare("SELECT id FROM user WHERE id_negocio = :n AND role LIKE '%ROLE_TITULAR%' AND (eliminado = 0 OR eliminado IS NULL)");
+            $q->execute([':n' => $idNegocio]);
+            $titulares = $q->fetchAll(\PDO::FETCH_COLUMN) ?: [];
+            $nombres = array_map(fn ($f) => $f['description'] . ' (faltaron ' . $f['faltante'] . ')', $faltantes);
+            $mensaje = ($sinConexion ? 'En una venta hecha sin conexión se vendió' : 'Se vendió')
+                . ' sin stock en el sistema: ' . implode(', ', $nombres)
+                . '. El stock quedó en 0. Revisalo en Stock > Stock a revisar.';
+            $insertar = $pdo->prepare('INSERT INTO notificaciones (id_negocio, usuario_id, titulo, mensaje, tipo) VALUES (:n, :u, :t, :m, :tipo)');
+            foreach ($titulares as $idTitular) {
+                $insertar->execute([':n' => $idNegocio, ':u' => (int) $idTitular, ':t' => 'Stock a revisar', ':m' => $mensaje, ':tipo' => 'alta']);
+            }
+        } catch (\Throwable $th) {
+            // La notificación es un extra: no frena la venta.
+        }
+    }
+
+    /** Faltantes sin revisar del negocio, el más nuevo primero. */
+    public function faltantes(int $idNegocio, bool $incluirRevisados = false): array
+    {
+        $sql = 'SELECT f.id, f.id_product, p.description, p.code, p.quantity AS stock_actual, f.sucursal,
+                    f.cantidad_vendida, f.stock_antes, f.faltante, f.sin_conexion, f.fecha_venta, f.creado,
+                    f.revisado, u.name AS vendedor
+                FROM stock_faltante f
+                LEFT JOIN product p ON p.id = f.id_product AND p.id_negocio = f.id_negocio
+                LEFT JOIN user u ON u.id = f.usuario AND u.id_negocio = f.id_negocio
+                WHERE f.id_negocio = :n' . ($incluirRevisados ? '' : ' AND f.revisado = 0') . '
+                ORDER BY f.creado DESC, f.id DESC
+                LIMIT 500';
+        try {
+            $q = $this->get_bbdd()->prepare($sql);
+            $q->execute([':n' => $idNegocio]);
+            return $q->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+        } catch (\PDOException $e) {
+            if ((int) ($e->errorInfo[1] ?? 0) === 1146) {
+                return [];
+            }
+            throw $e;
+        }
+    }
+
+    public function contarFaltantes(int $idNegocio): int
+    {
+        try {
+            $q = $this->get_bbdd()->prepare('SELECT COUNT(DISTINCT id_product) FROM stock_faltante WHERE id_negocio = :n AND revisado = 0');
+            $q->execute([':n' => $idNegocio]);
+            return (int) $q->fetchColumn();
+        } catch (\PDOException $e) {
+            return 0;
+        }
+    }
+
+    /** Marca como revisados los faltantes indicados (solo los del negocio). Devuelve cuántos. */
+    public function marcarFaltantesRevisados(int $idNegocio, array $ids): int
+    {
+        $ids = array_values(array_filter(array_map('intval', $ids), fn ($i) => $i > 0));
+        if (!$ids) {
+            return 0;
+        }
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $q = $this->get_bbdd()->prepare("UPDATE stock_faltante SET revisado = 1, revisado_en = NOW() WHERE id_negocio = ? AND revisado = 0 AND id IN ($marcas)");
+        $q->execute(array_merge([$idNegocio], $ids));
+        return $q->rowCount();
     }
 
     public function delete_salesProduct(DeleteSalesProductDTO $dto): ?bool

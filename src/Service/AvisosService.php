@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Repository\ProductsRepository;
+use App\Repository\SalesProductRepository;
 
 /**
  * Avisos que se muestran arriba del dashboard (Inicio) del front.
@@ -16,11 +17,13 @@ class AvisosService
 {
     private $rep_products;
     private $preciosService;
+    private $rep_sales;
 
-    public function __construct(ProductsRepository $rep_products, PreciosService $preciosService)
+    public function __construct(ProductsRepository $rep_products, PreciosService $preciosService, SalesProductRepository $rep_sales)
     {
         $this->rep_products = $rep_products;
         $this->preciosService = $preciosService;
+        $this->rep_sales = $rep_sales;
     }
 
     public function obtenerAvisos(int $idNegocio, bool $esTitular): array
@@ -38,6 +41,22 @@ class AvisosService
                     : "Hay {$sinStock} productos sin stock.",
                 'tipo' => 'advertencia',
             ];
+        }
+
+        // Ventas confirmadas sin stock (o hechas sin conexión) que dejaron el stock en 0.
+        if ($esTitular) {
+            $faltantes = $this->rep_sales->contarFaltantes($idNegocio);
+            if ($faltantes > 0) {
+                $avisos[] = [
+                    'id' => $this->idAviso('stock_faltante', $hoy, $faltantes),
+                    'titulo' => 'Stock a revisar',
+                    'mensaje' => $faltantes === 1
+                        ? 'Se vendió 1 producto que según el sistema no tenía stock. Revisalo en Stock.'
+                        : "Se vendieron {$faltantes} productos que según el sistema no tenían stock. Revisalos en Stock.",
+                    'tipo' => 'advertencia',
+                    'ruta' => '/stock-a-revisar',
+                ];
+            }
         }
 
         // Solo el administrador puede actualizar precios, así que solo a él le sirve el aviso.
