@@ -76,13 +76,26 @@ class EscaneoService
         return "$sistema · $navegador";
     }
 
-    /** @return array{id: int, token: string, vinculo_minutos: int} */
-    public function crear(int $idNegocio, int $sucursal, int $idUsuario): array
+    /** Fotos de facturas por sesión (cada una se lee por separado desde la PC). */
+    public const MAXIMO_FOTOS = 50;
+    public const MODOS = ['productos', 'factura'];
+
+    /**
+     * @param string $modo 'productos' (Caja: el celular escanea códigos) o 'factura'
+     *                     (Cargar factura: el celular saca la foto de la factura)
+     * @return array{id: int, token: string, vinculo_minutos: int, modo: string}
+     */
+    public function crear(int $idNegocio, int $sucursal, int $idUsuario, string $modo = 'productos'): array
     {
         $this->repo->purgar(self::HORAS_RETENCION);
         $token = self::nuevoSecreto();
-        $id = $this->repo->crear($idNegocio, $sucursal, $idUsuario, self::hash($token), self::MINUTOS_VINCULO);
-        return ['id' => $id, 'token' => $token, 'vinculo_minutos' => self::MINUTOS_VINCULO];
+        $id = $this->repo->crear($idNegocio, $sucursal, $idUsuario, self::hash($token), self::MINUTOS_VINCULO, $modo);
+        return ['id' => $id, 'token' => $token, 'vinculo_minutos' => self::MINUTOS_VINCULO, 'modo' => $modo];
+    }
+
+    public function agregarFoto(array $sesion, string $mime, string $datos): ?int
+    {
+        return $this->repo->agregarFoto((int) $sesion['id'], $mime, $datos, self::MAXIMO_FOTOS);
     }
 
     /** Estado de la sesión y códigos nuevos para la PC. null si no es del usuario. */
@@ -95,8 +108,10 @@ class EscaneoService
         return [
             'id' => (int) $sesion['id'],
             'estado' => self::estado($sesion),
+            'modo' => $sesion['modo'],
             'dispositivo' => $sesion['dispositivo'],
             'codigos' => $this->repo->codigosDesde((int) $sesion['id'], max(0, $desde)),
+            'fotos' => $sesion['modo'] === 'factura' ? $this->repo->fotos((int) $sesion['id']) : [],
         ];
     }
 

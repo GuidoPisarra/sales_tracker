@@ -34,7 +34,15 @@ class EscaneoController extends BaseController
     #[Route('/sesiones', name: 'app_escaneo_crear', methods: ['POST'])]
     public function crear(Request $request, EscaneoService $escaneo): JsonResponse
     {
-        $sucursal = $this->datos($request)['sucursal'] ?? null;
+        $datos = $this->datos($request);
+        $sucursal = $datos['sucursal'] ?? null;
+        $modo = $datos['modo'] ?? 'productos';
+        if (!in_array($modo, EscaneoService::MODOS, true)) {
+            return $this->respuesta(400, [], ['Modo de escaneo inválido.'], 400);
+        }
+        if ($modo === 'factura' && ($check = $this->soloTitular())) {
+            return $check;
+        }
         if (!is_numeric($sucursal)) {
             return $this->respuesta(400, [], ['Falta la sucursal.'], 400);
         }
@@ -42,7 +50,7 @@ class EscaneoController extends BaseController
             return $check;
         }
         try {
-            $sesion = $escaneo->crear($this->idNegocioUsuarioActual(), (int) $sucursal, $this->idUsuarioActual());
+            $sesion = $escaneo->crear($this->idNegocioUsuarioActual(), (int) $sucursal, $this->idUsuarioActual(), $modo);
             return $this->respuesta(201, $sesion, [], 201);
         } catch (\Throwable $th) {
             error_log('app_escaneo_crear: ' . $th->getMessage());
@@ -98,6 +106,7 @@ class EscaneoController extends BaseController
         }
         return $this->respuesta(200, [
             'estado' => EscaneoService::estado($sesion),
+            'modo' => $sesion['modo'],
             'codigos' => $escaneo->cantidadCodigos((int) $sesion['id']),
         ], []);
     }
@@ -134,9 +143,42 @@ class EscaneoController extends BaseController
         return $this->respuesta(200, ['codigo' => $codigo, 'producto' => $r['producto']], []);
     }
 
-    private function sesionDelCelular(Request $request, EscaneoService $escaneo): array|JsonResponse
+    /**
+     * Público: el celular manda la foto de una factura (multipart: clave, archivo).
+     * La PC la ve en el estado de la sesión y la manda a leer (/api/facturas/leer-escaneo).
+     */
+    #[Route('/movil/foto', name: 'app_escaneo_foto', methods: ['POST'])]
+    public function foto(Request $request, EscaneoService $escaneo, RateLimiterFactory $escaneoCodigoLimiter): JsonResponse
     {
-        $clave = $this->datos($request)['clave'] ?? null;
+        if ($r = $this->limiteSuperado($escaneoCodigoLimiter, $request)) {
+            return $r;
+        }
+        $sesion = $this->sesionDelCelular($request, $escaneo, (string) $request->request->get('clave', ''));
+        if ($sesion instanceof JsonResponse) {
+            return $sesion;
+        }
+        $estado = EscaneoService::estado($sesion);
+        if ($estado !== 'vinculada' || $sesion['modo'] !== 'factura') {
+            return $this->respuesta(410, ['estado' => $estado], ['La sesión ya no está abierta. Volvé a conectar el celular desde la PC.'], 410);
+        }
+        $archivo = $request->files->get('archivo');
+        if (!$archivo || !$archivo->isValid()) {
+            return $this->respuesta(400, [], ['No llegó la foto. Probá de nuevo.'], 400);
+        }
+        $mime = (string) $archivo->getMimeType();
+        if (!in_array($mime, FacturasController::MIMES, true) || $archivo->getSize() > FacturasController::TAMANIO_MAXIMO) {
+            return $this->respuesta(415, [], ['Mandá una foto (JPG, PNG o WEBP) de menos de 8 MB.'], 415);
+        }
+        $id = $escaneo->agregarFoto($sesion, $mime, (string) file_get_contents($archivo->getPathname()));
+        if ($id === null) {
+            return $this->respuesta(409, [], ['Se llegó al máximo de fotos de esta sesión. Volvé a conectar el celular desde la PC.'], 409);
+        }
+        return $this->respuesta(200, ['id' => $id], []);
+    }
+
+    private function sesionDelCelular(Request $request, EscaneoService $escaneo, ?string $claveForm = null): array|JsonResponse
+    {
+        $clave = $claveForm ?? ($this->datos($request)['clave'] ?? null);
         $sesion = EscaneoService::conForma($clave) ? $escaneo->sesionDelCelular($clave) : null;
         if (!$sesion) {
             // 403 y no 401: en el front un 401 cierra la sesión de Kontia, y el celular puede tener una abierta.

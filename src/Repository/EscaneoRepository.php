@@ -11,15 +11,15 @@ use PDO;
  */
 class EscaneoRepository extends BaseRepository
 {
-    private const COLUMNAS = 'id, id_negocio, sucursal, id_usuario, dispositivo, creada, vence_vinculo, vinculada_en, vence_en, cerrada_en,
+    private const COLUMNAS = 'id, id_negocio, sucursal, id_usuario, modo, dispositivo, creada, vence_vinculo, vinculada_en, vence_en, cerrada_en,
         (vence_vinculo > NOW()) AS vinculo_vigente, (vence_en IS NOT NULL AND vence_en > NOW()) AS sesion_vigente';
 
-    public function crear(int $idNegocio, int $sucursal, int $idUsuario, string $tokenHash, int $minutosVinculo): int
+    public function crear(int $idNegocio, int $sucursal, int $idUsuario, string $tokenHash, int $minutosVinculo, string $modo = 'productos'): int
     {
         $pdo = $this->get_bbdd();
-        $pdo->prepare('INSERT INTO escaneo_sesion (id_negocio, sucursal, id_usuario, token_hash, vence_vinculo)
-            VALUES (:n, :s, :u, :t, NOW() + INTERVAL :m MINUTE)')
-            ->execute([':n' => $idNegocio, ':s' => $sucursal, ':u' => $idUsuario, ':t' => $tokenHash, ':m' => $minutosVinculo]);
+        $pdo->prepare('INSERT INTO escaneo_sesion (id_negocio, sucursal, id_usuario, token_hash, vence_vinculo, modo)
+            VALUES (:n, :s, :u, :t, NOW() + INTERVAL :m MINUTE, :modo)')
+            ->execute([':n' => $idNegocio, ':s' => $sucursal, ':u' => $idUsuario, ':t' => $tokenHash, ':m' => $minutosVinculo, ':modo' => $modo]);
         return (int) $pdo->lastInsertId();
     }
 
@@ -96,11 +96,46 @@ class EscaneoRepository extends BaseRepository
         return $fila ? ['description' => $fila['description'], 'salePrice' => (float) $fila['salePrice'], 'quantity' => (int) $fila['quantity']] : null;
     }
 
+    /** Guarda una foto del celular si la sesión no llegó al máximo. Devuelve su id o null. */
+    public function agregarFoto(int $idSesion, string $mime, string $datos, int $maximo): ?int
+    {
+        $pdo = $this->get_bbdd();
+        $stmt = $pdo->prepare('INSERT INTO escaneo_foto (id_sesion, mime, datos)
+            SELECT :s, :m, :d FROM DUAL WHERE (SELECT COUNT(*) FROM escaneo_foto WHERE id_sesion = :s2) < :max');
+        $stmt->bindValue(':s', $idSesion, PDO::PARAM_INT);
+        $stmt->bindValue(':m', $mime);
+        $stmt->bindValue(':d', $datos, PDO::PARAM_LOB);
+        $stmt->bindValue(':s2', $idSesion, PDO::PARAM_INT);
+        $stmt->bindValue(':max', $maximo, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->rowCount() === 1 ? (int) $pdo->lastInsertId() : null;
+    }
+
+    /** @return int[] ids de las fotos de la sesión */
+    public function fotos(int $idSesion): array
+    {
+        $stmt = $this->get_bbdd()->prepare('SELECT id FROM escaneo_foto WHERE id_sesion = :s ORDER BY id');
+        $stmt->execute([':s' => $idSesion]);
+        return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
+    }
+
+    /** Una foto, solo si la sesión es del usuario. */
+    public function fotoDelUsuario(int $idSesion, int $idFoto, int $idUsuario): ?array
+    {
+        $stmt = $this->get_bbdd()->prepare('SELECT f.mime, f.datos FROM escaneo_foto f JOIN escaneo_sesion s ON s.id = f.id_sesion
+            WHERE f.id = :f AND s.id = :s AND s.id_usuario = :u');
+        $stmt->execute([':f' => $idFoto, ':s' => $idSesion, ':u' => $idUsuario]);
+        $fila = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $fila ? ['mime' => $fila['mime'], 'datos' => (string) $fila['datos']] : null;
+    }
+
     /** Borra las sesiones (y sus códigos) viejas. */
     public function purgar(int $horas): void
     {
         $pdo = $this->get_bbdd();
         $pdo->prepare('DELETE c FROM escaneo_codigo c JOIN escaneo_sesion s ON s.id = c.id_sesion WHERE s.creada < NOW() - INTERVAL :h HOUR')
+            ->execute([':h' => $horas]);
+        $pdo->prepare('DELETE f FROM escaneo_foto f JOIN escaneo_sesion s ON s.id = f.id_sesion WHERE s.creada < NOW() - INTERVAL :h HOUR')
             ->execute([':h' => $horas]);
         $pdo->prepare('DELETE FROM escaneo_sesion WHERE creada < NOW() - INTERVAL :h HOUR')->execute([':h' => $horas]);
     }

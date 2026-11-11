@@ -8,3 +8,6 @@ services:
         public: true
     App\Service\MercadoPagoClient:
         public: true
+    App\Service\Facturas\LectorFacturas:
+        alias: App\Service\Facturas\GeminiLectorFacturas
+        public: true
