@@ -21,7 +21,7 @@ abstract class KontiaTestCase extends WebTestCase
     private const TABLAS = [
         'negocio', 'user', 'proveedores', 'product', 'sales', 'sales_product', 'clientes',
         'ctacte', 'pagos', 'cambios', 'expense', 'notificaciones', 'suscripcion',
-        'pago_suscripcion', 'webhook_evento', 'uso_ia', 'auditoria', 'venta_clave',
+        'pago_suscripcion', 'webhook_evento', 'uso_ia', 'auditoria', 'venta_clave', 'escaneo_codigo', 'escaneo_sesion',
     ];
 
     protected function setUp(): void
