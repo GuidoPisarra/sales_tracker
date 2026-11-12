@@ -87,17 +87,13 @@ TXT;
         ];
 
         $modelo = Entorno::get('GEMINI_MODEL', self::MODELO_POR_DEFECTO);
-        try {
-            $respuesta = $this->http->request('POST', sprintf(self::URL, rawurlencode($modelo)), [
-                'headers' => ['x-goog-api-key' => Entorno::get('GEMINI_API_KEY'), 'Content-Type' => 'application/json'],
-                'json' => $cuerpo,
-                'timeout' => 90,
-            ]);
-            $estado = $respuesta->getStatusCode();
-            $datos = $respuesta->toArray(false);
-        } catch (\Throwable $th) {
-            error_log('Gemini: ' . $th->getMessage());
-            throw new \RuntimeException('No se pudo conectar con el servicio que lee las facturas. Probá de nuevo en unos minutos.');
+        // Leer una factura no necesita "pensar" mucho: con poco pensamiento responde
+        // en segundos en vez de minutos. Si el modelo no acepta la opción, se reintenta sin ella.
+        $conPocoPensamiento = $cuerpo;
+        $conPocoPensamiento['generationConfig']['thinkingConfig'] = ['thinkingLevel' => 'low'];
+        [$estado, $datos] = $this->pedir($modelo, $conPocoPensamiento);
+        if ($estado === 400 && stripos(json_encode($datos), 'thinking') !== false) {
+            [$estado, $datos] = $this->pedir($modelo, $cuerpo);
         }
 
         if ($estado === 429) {
@@ -108,12 +104,40 @@ TXT;
             throw new \RuntimeException('El servicio que lee las facturas devolvió un error. Probá de nuevo en unos minutos.');
         }
 
-        $texto = $datos['candidates'][0]['content']['parts'][0]['text'] ?? null;
-        $json = is_string($texto) ? json_decode($texto, true) : null;
+        // Los modelos nuevos pueden devolver varias partes (y partes de "pensamiento"):
+        // se juntan solo las de texto de la respuesta.
+        $texto = '';
+        foreach ($datos['candidates'][0]['content']['parts'] ?? [] as $parte) {
+            if (isset($parte['text']) && empty($parte['thought'])) {
+                $texto .= $parte['text'];
+            }
+        }
+        $texto = trim($texto);
+        if (str_starts_with($texto, '```')) {
+            $texto = trim(preg_replace('/^```(?:json)?\s*|\s*```$/', '', $texto));
+        }
+        $json = $texto !== '' ? json_decode($texto, true) : null;
         if (!is_array($json)) {
             error_log('Gemini: respuesta sin JSON: ' . substr(json_encode($datos), 0, 500));
             throw new \RuntimeException('No se pudo leer la factura. Probá con una foto más nítida y derecha.');
         }
         return $json;
+    }
+
+    /** @return array{0:int,1:array} estado HTTP y respuesta decodificada */
+    private function pedir(string $modelo, array $cuerpo): array
+    {
+        try {
+            $respuesta = $this->http->request('POST', sprintf(self::URL, rawurlencode($modelo)), [
+                'headers' => ['x-goog-api-key' => Entorno::get('GEMINI_API_KEY'), 'Content-Type' => 'application/json'],
+                'json' => $cuerpo,
+                'timeout' => 180,
+                'max_duration' => 180,
+            ]);
+            return [$respuesta->getStatusCode(), $respuesta->toArray(false)];
+        } catch (\Throwable $th) {
+            error_log('Gemini: ' . $th->getMessage());
+            throw new \RuntimeException('No se pudo conectar con el servicio que lee las facturas. Probá de nuevo en unos minutos.');
+        }
     }
 }
