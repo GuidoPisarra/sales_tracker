@@ -93,7 +93,20 @@ TXT;
         $conPocoPensamiento['generationConfig']['thinkingConfig'] = ['thinkingLevel' => 'low'];
         [$estado, $datos] = $this->pedir($modelo, $conPocoPensamiento);
         if ($estado === 400 && stripos(json_encode($datos), 'thinking') !== false) {
+            $conPocoPensamiento = $cuerpo;
             [$estado, $datos] = $this->pedir($modelo, $cuerpo);
+        }
+        // 500/503: Google saturado por un momento. Se reintenta dos veces antes de rendirse.
+        foreach ([2, 5] as $espera) {
+            if ($estado !== 500 && $estado !== 503) {
+                break;
+            }
+            sleep($espera);
+            [$estado, $datos] = $this->pedir($modelo, $conPocoPensamiento);
+        }
+        if ($estado === 500 || $estado === 503) {
+            error_log('Gemini HTTP ' . $estado . ': ' . substr(json_encode($datos), 0, 500));
+            throw new \RuntimeException('El servicio de IA de Google está saturado en este momento. Probá de nuevo en unos minutos.');
         }
 
         if ($estado === 429) {
