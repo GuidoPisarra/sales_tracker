@@ -8,13 +8,13 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 /**
  * Lee facturas con la API de Gemini (Google). Variables de entorno:
  *   GEMINI_API_KEY  la clave de Google AI Studio (sin ella, la función queda apagada)
- *   GEMINI_MODEL    el modelo (por defecto gemini-2.5-flash)
+ *   GEMINI_MODEL    el modelo (por defecto gemini-3.8-flash)
  * Se pide la respuesta como JSON con un esquema fijo, así no hay que interpretar texto libre.
  */
 class GeminiLectorFacturas implements LectorFacturas
 {
     private const URL = 'https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent';
-    private const MODELO_POR_DEFECTO = 'gemini-2.5-flash';
+    private const MODELO_POR_DEFECTO = 'gemini-3.8-flash';
 
     private const INSTRUCCIONES = <<<'TXT'
 Sos un asistente que lee facturas, remitos y tickets de proveedores de comercios de Argentina.
