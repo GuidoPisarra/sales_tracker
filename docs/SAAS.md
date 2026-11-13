@@ -161,6 +161,30 @@ Respuestas nuevas a manejar en el front:
 - **402** con `datos.codigo = "solo_lectura"`: prueba vencida, mora o cancelada.
 - **401** en el login con el mensaje "Confirmá tu email...": cuenta sin verificar.
 
+## 7 bis. Lo nuevo de la rama `saas`
+
+Variables nuevas en el `.env` (ver `.env.dist`):
+
+- `LEGAL_TITULAR`, `LEGAL_CUIT`, `LEGAL_PROVINCIA`: datos que muestran Términos y Privacidad.
+- `SOPORTE_EMAIL`, `SOPORTE_WHATSAPP`: botón de Ayuda de la app y pie de los mails.
+- `AVISAR_ERRORES`: 1 manda un mail a `ADMIN_EMAILS` cuando la API da un error 500 (uno por hora por error).
+- `ADMIN_EMAILS` ahora también define quién ve el **panel de administración** (`/admin` en el front).
+- `DIAS_PRUEBA` por defecto pasa a 7.
+- `CORS_ALLOW_ORIGIN` tiene que incluir la app y la web de Vercel (ver el ejemplo).
+
+| Método y ruta | Quién | Qué hace |
+| --- | --- | --- |
+| GET `/api/publico/info` | público | Titular, CUIT, provincia, soporte y días de prueba |
+| POST `/api/publico/solicitud` | público | Botón de arrepentimiento / baja: registra el pedido, avisa a `ADMIN_EMAILS` y devuelve el número de trámite |
+| GET `/api/onboarding` | logueado | Primeros pasos: productos, primera venta, empleados, catálogo |
+| GET `/api/admin/resumen` | admin Kontia | Métricas: negocios, pruebas, pagando, ingreso mensual, altas, conversión, bajas |
+| GET `/api/admin/negocios?q=&estado=` | admin Kontia | Todos los negocios con plan, estado, titular y último pago |
+| GET `/api/admin/negocios/{id}` | admin Kontia | Detalle con pagos y actividad |
+| POST `/api/admin/negocios/{id}/prueba` | admin Kontia | Suma días de prueba |
+| POST `/api/admin/negocios/{id}/plan` | admin Kontia | Cambia el plan a mano (`sin_limites` = de por vida) |
+| POST `/api/admin/negocios/{id}/cancelar` | admin Kontia | Cancela el débito en Mercado Pago y la suscripción |
+| GET `/api/admin/solicitudes` | admin Kontia | Pedidos de baja y arrepentimiento |
+
 ## 8. Tests
 
 ```
