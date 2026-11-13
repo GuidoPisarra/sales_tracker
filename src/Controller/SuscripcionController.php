@@ -30,6 +30,8 @@ class SuscripcionController extends BaseController
         $datos = $suscripciones->resumen($idNegocio, true);
         $datos['planes'] = $suscripciones->planesPublicos();
         $datos['pagos'] = $this->esTitular() ? $repo->pagos($idNegocio) : [];
+        $usuario = $this->tenant()->usuario();
+        $datos['admin_kontia'] = AdminController::esAdminKontia($usuario ? $usuario->get_email() : null);
         return $this->respuesta(200, $datos, []);
     }
 

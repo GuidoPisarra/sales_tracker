@@ -59,7 +59,7 @@ class RegistroService
         if ($idPlan === null) {
             throw new \RuntimeException('No existe el plan de prueba "' . $plan . '". ¿Corriste las migraciones?');
         }
-        $hasta = (new \DateTimeImmutable())->modify('+' . Entorno::int('DIAS_PRUEBA', 14) . ' days');
+        $hasta = (new \DateTimeImmutable())->modify('+' . Entorno::int('DIAS_PRUEBA', 7) . ' days');
         return ['id_plan' => $idPlan, 'prueba_hasta' => $hasta->format('Y-m-d 23:59:59')];
     }
 
@@ -111,6 +111,7 @@ class RegistroService
             'google_id' => $google['sub'],
         ]);
         $this->auditoria->registrar('registro', ['email' => $google['email'], 'via' => 'google'], $idNegocio, $idUsuario);
+        $this->mail->enviarBienvenida($google['email'], trim((string) ($d['nombre'] ?? '')) ?: (string) $google['nombre']);
         return $idNegocio;
     }
 
@@ -119,6 +120,8 @@ class RegistroService
         $email = $token !== '' ? $this->repo->verificarEmail($token) : null;
         if ($email !== null) {
             $this->auditoria->registrar('email_verificado', ['email' => $email]);
+            $u = $this->repo->usuarioPorEmail($email);
+            $this->mail->enviarBienvenida($email, (string) ($u['name'] ?? ''));
         }
         return $email !== null;
     }

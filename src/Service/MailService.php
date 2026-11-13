@@ -47,6 +47,35 @@ class MailService
         ));
     }
 
+    /** Bienvenida al confirmar el email (o al crear la cuenta con Google). */
+    public function enviarBienvenida(string $email, string $nombre): bool
+    {
+        $dias = Entorno::int('DIAS_PRUEBA', 7);
+        return $this->enviar($email, 'Bienvenido a Kontia', $this->plantilla(
+            'Hola ' . ($nombre !== '' ? $nombre : '') . ',',
+            'Tu cuenta ya está lista y tenés ' . $dias . ' días para probar Kontia gratis, sin tarjeta. '
+            . 'Para arrancar: 1) cargá o importá tus productos desde Excel, 2) hacé tu primera venta en Caja, '
+            . '3) sumá a tus empleados y 4) si querés, activá tu catálogo online para recibir pedidos por WhatsApp. '
+            . 'En Inicio vas a ver estos pasos para seguirlos de a uno.',
+            'Entrar a Kontia',
+            $this->urlFront('/index')
+        ));
+    }
+
+    /** Confirmación al cliente de un pedido de arrepentimiento o de baja hecho desde la web. */
+    public function enviarConfirmacionSolicitud(string $email, string $tipo, string $codigo): bool
+    {
+        $que = $tipo === 'arrepentimiento' ? 'arrepentimiento (revocación de la contratación)' : 'baja del servicio';
+        return $this->enviar($email, 'Recibimos tu pedido de ' . ($tipo === 'arrepentimiento' ? 'arrepentimiento' : 'baja'), $this->plantilla(
+            'Hola,',
+            'Recibimos tu pedido de ' . $que . '. Tu número de trámite es ' . $codigo . '. '
+            . 'Lo vamos a procesar dentro de las 24 horas hábiles y te avisamos por este medio. '
+            . 'Si tenías débito automático en Mercado Pago, lo damos de baja y no se te va a volver a cobrar.',
+            'Ir a Kontia',
+            $this->urlFront('/login')
+        ));
+    }
+
     public function enviarAviso(string $email, string $asunto, string $mensaje, string $boton = 'Ver mi plan'): bool
     {
         return $this->enviar($email, $asunto, $this->plantilla('Hola,', $mensaje, $boton, $this->urlFront('/mi-plan')));
@@ -97,10 +126,29 @@ class MailService
     {
         $e = fn ($s) => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
         return '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#222">'
-            . '<h2 style="color:#3880ff">Kontia</h2>'
+            . '<h2 style="color:#2a8253">Kontia</h2>'
             . '<p>' . $e($saludo) . '</p><p>' . $e($texto) . '</p>'
-            . '<p><a href="' . $e($link) . '" style="display:inline-block;background:#3880ff;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none">' . $e($boton) . '</a></p>'
+            . '<p><a href="' . $e($link) . '" style="display:inline-block;background:#2a8253;color:#fff;padding:12px 20px;border-radius:6px;text-decoration:none">' . $e($boton) . '</a></p>'
             . '<p style="font-size:12px;color:#777">Si el botón no funciona, copiá este link: ' . $e($link) . '</p>'
+            . $this->pie()
             . '</div>';
+    }
+
+    /** Pie con los datos de soporte (SOPORTE_EMAIL / SOPORTE_WHATSAPP). */
+    private function pie(): string
+    {
+        $e = fn ($s) => htmlspecialchars($s, ENT_QUOTES, 'UTF-8');
+        $partes = [];
+        if ($mail = Entorno::get('SOPORTE_EMAIL')) {
+            $partes[] = 'escribinos a ' . $e($mail);
+        }
+        if ($wa = preg_replace('/\D/', '', Entorno::get('SOPORTE_WHATSAPP'))) {
+            $partes[] = 'por WhatsApp al <a href="https://wa.me/' . $e($wa) . '" style="color:#2a8253">+' . $e($wa) . '</a>';
+        }
+        if (!$partes) {
+            return '';
+        }
+        return '<p style="font-size:12px;color:#777;border-top:1px solid #eee;padding-top:8px">¿Necesitás ayuda? '
+            . implode(' o ', $partes) . '.</p>';
     }
 }

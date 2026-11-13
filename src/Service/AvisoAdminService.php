@@ -21,6 +21,9 @@ class AvisoAdminService
         'pago_suscripcion' => 'Cobro de suscripción',
         'cancelacion_plan' => 'Pidieron cancelar el plan',
         'suscripcion_cancelada' => 'Suscripción cancelada',
+        'solicitud_arrepentimiento' => 'URGENTE: pedido de arrepentimiento (devolver el dinero)',
+        'solicitud_baja' => 'URGENTE: pedido de baja',
+        'error_api' => 'Error en la API',
     ];
 
     private MailService $mail;
@@ -90,6 +93,11 @@ class AvisoAdminService
         }
         if (!empty($detalle['mp_id'])) {
             $filas['ID en Mercado Pago'] = (string) $detalle['mp_id'];
+        }
+        foreach (['codigo' => 'N° de trámite', 'email_contacto' => 'Email de contacto', 'motivo' => 'Motivo', 'error' => 'Error', 'ruta' => 'Ruta'] as $clave => $titulo) {
+            if (!empty($detalle[$clave])) {
+                $filas[$titulo] = (string) $detalle[$clave];
+            }
         }
         $filas['Fecha'] = (new \DateTimeImmutable('now', new \DateTimeZone('America/Argentina/Buenos_Aires')))->format('d/m/Y H:i');
         return [$asunto, $filas];

@@ -34,6 +34,7 @@ class SuscripcionListener implements EventSubscriberInterface
     /** Prefijos que siguen andando en solo lectura (cuenta, plan, pagos, avisos). */
     private const PERMITIDAS_EN_SOLO_LECTURA = [
         '/api/usuario', '/api/registro', '/api/suscripcion', '/api/webhooks', '/api/planes', '/api/notificaciones',
+        '/api/admin', '/api/publico', '/api/onboarding',
     ];
 
     private TenantContext $tenant;

@@ -38,7 +38,7 @@ class RegistroTest extends KontiaTestCase
         $s = $this->pdo()->query('SELECT s.*, p.codigo FROM suscripcion s JOIN plan_suscripcion p ON p.id = s.id_plan WHERE id_negocio = 8')->fetch(\PDO::FETCH_ASSOC);
         $this->assertSame('prueba', $s['estado']);
         $this->assertSame('pro', $s['codigo']);
-        $this->assertGreaterThan(new \DateTime('+13 days'), new \DateTime($s['prueba_hasta']));
+        $this->assertGreaterThan(new \DateTime('+6 days'), new \DateTime($s['prueba_hasta']));
 
         $this->assertSame('Kiosco Pepe', $this->pdo()->query('SELECT nombre FROM negocio WHERE id_negocio = 8')->fetchColumn());
     }

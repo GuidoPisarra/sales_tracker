@@ -88,7 +88,9 @@ class AuthenticationSuccessListener
             'plan' => $plan,
             'suscripcion' => $suscripcion,
             'asistente_ia' => (bool) $datos_usuario['asistente_ia'],
-            'precios_desactualizados' => $preciosDesactualizados
+            'precios_desactualizados' => $preciosDesactualizados,
+            // Dueños de Kontia (ADMIN_EMAILS): el front muestra el panel de administración.
+            'admin_kontia' => \App\Controller\AdminController::esAdminKontia($user->get_email()),
         ];
 
         $event->setData($data);
