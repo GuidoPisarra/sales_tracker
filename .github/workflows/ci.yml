@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, mejoras-back]
+    branches: [main, mejoras-back, saas]
   pull_request:
 
 jobs:

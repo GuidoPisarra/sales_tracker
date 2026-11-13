@@ -30,6 +30,8 @@ class SuscripcionController extends BaseController
         $datos = $suscripciones->resumen($idNegocio, true);
         $datos['planes'] = $suscripciones->planesPublicos();
         $datos['pagos'] = $this->esTitular() ? $repo->pagos($idNegocio) : [];
+        $usuario = $this->tenant()->usuario();
+        $datos['admin_kontia'] = AdminController::esAdminKontia($usuario ? $usuario->get_email() : null);
         return $this->respuesta(200, $datos, []);
     }
 
@@ -39,9 +41,16 @@ class SuscripcionController extends BaseController
         if ($check = $this->soloTitular()) {
             return $check;
         }
-        $plan = (string) (json_decode($request->getContent(), true)['plan'] ?? '');
+        $body = json_decode($request->getContent(), true) ?: [];
+        $plan = (string) ($body['plan'] ?? '');
+        // Mercado Pago exige pagar con una cuenta cuyo email sea el del pagador:
+        // si el titular usa otro email en Mercado Pago, lo manda en email_pago.
+        $emailPago = trim((string) ($body['email_pago'] ?? ''));
+        if ($emailPago !== '' && !filter_var($emailPago, FILTER_VALIDATE_EMAIL)) {
+            return $this->respuesta(400, [], ['El email de Mercado Pago no es válido.'], 400);
+        }
         try {
-            $resultado = $cobros->elegirPlan($this->tenant()->idNegocioRequerido(), $plan, $this->tenant()->usuario()->get_email());
+            $resultado = $cobros->elegirPlan($this->tenant()->idNegocioRequerido(), $plan, $emailPago !== '' ? $emailPago : $this->tenant()->usuario()->get_email());
             return $this->respuesta(200, $resultado, []);
         } catch (\DomainException $e) {
             return $this->respuesta(400, [], [$e->getMessage()], 400);

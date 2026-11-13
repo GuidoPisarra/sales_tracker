@@ -45,7 +45,7 @@ class RegistroController extends BaseController
         return $this->respuesta(200, [
             'captcha_site_key' => Entorno::get('TURNSTILE_SITE_KEY') ?: null,
             'google_client_id' => Entorno::lista('GOOGLE_CLIENT_IDS')[0] ?? null,
-            'dias_prueba' => Entorno::int('DIAS_PRUEBA', 14),
+            'dias_prueba' => Entorno::int('DIAS_PRUEBA', 7),
         ], []);
     }
 

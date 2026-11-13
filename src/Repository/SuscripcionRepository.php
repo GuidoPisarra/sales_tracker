@@ -63,7 +63,7 @@ class SuscripcionRepository extends BaseRepository
 
     public function actualizar(int $idNegocio, array $campos): void
     {
-        $permitidos = ['id_plan', 'estado', 'prueba_hasta', 'periodo_hasta', 'en_mora_desde', 'cancelada_en', 'mp_preapproval_id', 'id_plan_pendiente', 'exento_limites'];
+        $permitidos = ['id_plan', 'estado', 'prueba_hasta', 'periodo_hasta', 'en_mora_desde', 'cancelada_en', 'mp_preapproval_id', 'id_plan_pendiente', 'exento_limites', 'aviso_prueba_enviado'];
         $sets = [];
         $params = [':n' => $idNegocio];
         foreach ($campos as $campo => $valor) {

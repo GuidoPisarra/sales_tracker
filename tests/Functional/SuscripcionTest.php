@@ -133,6 +133,12 @@ class SuscripcionTest extends KontiaTestCase
         $this->assertSame('https://mp.test/checkout', $json['datos']['init_point']);
         $this->assertSame(['crear', 1, 'premium', 'a@test.com'], $mp->llamadas[0]);
         $this->assertSame('pre-nuevo', $this->pdo()->query('SELECT mp_preapproval_id FROM suscripcion WHERE id_negocio = 1')->fetchColumn());
+
+        [$codigo] = $this->pedir('POST', '/api/suscripcion/checkout', ['plan' => 'pro', 'email_pago' => 'no-es-email'], $this->tokenPara('a@test.com'));
+        $this->assertSame(400, $codigo, 'Email de Mercado Pago inválido');
+        [$codigo] = $this->pedir('POST', '/api/suscripcion/checkout', ['plan' => 'pro', 'email_pago' => 'otro@mp.com'], $this->tokenPara('a@test.com'));
+        $this->assertSame(200, $codigo);
+        $this->assertSame(['crear', 1, 'pro', 'otro@mp.com'], $mp->llamadas[1]);
     }
 
     private function webhook(string $tipo, string $dataId, string $secreto = 'secreto-test'): int
