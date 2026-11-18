@@ -185,6 +185,47 @@ Variables nuevas en el `.env` (ver `.env.dist`):
 | POST `/api/admin/negocios/{id}/cancelar` | admin Kontia | Cancela el débito en Mercado Pago y la suscripción |
 | GET `/api/admin/solicitudes` | admin Kontia | Pedidos de baja y arrepentimiento |
 
+## 7 ter. Fotos de productos (catálogo online)
+
+Cada producto puede tener fotos que se ven en el catálogo online. El servidor
+las convierte a WebP (1200 px + miniatura cuadrada de 400 px), borra los datos
+EXIF (ubicación del celular) y guarda solo el nombre del archivo en la base.
+
+Fotos por producto según el plan (`plan_suscripcion.max_fotos_producto`, migración
+0009): Starter 1, Pro 3, Premium 5, Fundador 5. Los negocios sin límites (plan de
+por vida) usan `FOTOS_MAX_SIN_LIMITES` (5). Si un negocio baja de plan no se borra
+nada: el catálogo muestra solo las primeras.
+
+Puesta en marcha en el VPS:
+
+1. Confirmar GD con WebP: `php -r "print_r(gd_info());"` tiene que mostrar
+   `[WebP Support] => 1` (si no: `sudo apt install php8.x-gd` y reiniciar Apache).
+2. Carpeta: `sudo mkdir -p /var/www/fotos-kontia && sudo chown www-data:www-data /var/www/fotos-kontia`.
+3. Apache: pegar `scripts/apache-fotos.conf` en el VirtualHost y recargar.
+4. PHP: `upload_max_filesize = 10M` y `post_max_size = 12M` en el php.ini de Apache.
+5. `.env`: `FOTOS_ALMACEN`, `FOTOS_DIR`, `FOTOS_URL_BASE` (ver `.env.dist`), y
+   `composer dump-env prod` si se usa `.env.local.php`.
+6. Cron: `app:fotos:limpiar` (ver `scripts/crontab.ejemplo`).
+7. Backup: sumar `/var/www/fotos-kontia` a lo que se copia con rclone.
+
+Pasar a Cloudflare R2 más adelante: crear el bucket con dominio público,
+`rclone sync /var/www/fotos-kontia r2:kontia-fotos`, cargar `R2_*`,
+`FOTOS_ALMACEN=r2` y `FOTOS_URL_BASE=https://<dominio del bucket>`, limpiar
+caché y repetir el `rclone sync`. La base no cambia.
+
+Baja definitiva de un negocio: `php bin/console app:fotos:limpiar --negocio=ID`.
+
+| Método y ruta | Quién | Qué hace |
+| --- | --- | --- |
+| GET `/api/productos/{id}/fotos` | logueado | Fotos del producto, máximo del plan y nombre del plan |
+| POST `/api/productos/{id}/fotos` | logueado | Sube una foto (multipart, campo `foto`, hasta 10 MB). 402 `limite_plan` / `fotos` si llegó al máximo |
+| PUT `/api/productos/{id}/fotos/orden` | logueado | `{ids: [...]}`; la primera queda de portada |
+| DELETE `/api/productos/{id}/fotos/{idFoto}` | logueado | Borra una foto |
+
+El catálogo público (`/api/publico/catalogo/{slug}`) devuelve en cada producto
+`fotos: [{url, mini, ancho, alto}]`, y `/api/catalogo/config` suma
+`productos_sin_foto`. El panel de administración muestra `fotos_mb` por negocio.
+
 ## 8. Tests
 
 ```

@@ -10,3 +10,6 @@ MAILTO=""
 
 # Prueba de restore el primer domingo de cada mes a las 5.
 0 5 1-7 * 0 /ruta/a/sales_tracker/scripts/probar-restore.sh >> /var/log/kontia-backup.log 2>&1
+
+# Fotos de productos que ya no existen: se borran todos los días a las 4.
+0 4 * * * cd /ruta/a/sales_tracker && APP_ENV=prod php bin/console app:fotos:limpiar >> /var/log/kontia-cron.log 2>&1

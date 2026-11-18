@@ -65,3 +65,9 @@ services:
 
     # Lectura de facturas con IA (para cambiar de proveedor, apuntar a otra implementación).
     App\Service\Facturas\LectorFacturas: '@App\Service\Facturas\GeminiLectorFacturas'
+
+    # Fotos de productos: el almacén se elige con FOTOS_ALMACEN (local o r2).
+    App\Service\Fotos\AlmacenLocal:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+    App\Service\Fotos\AlmacenFotos: '@App\Service\Fotos\AlmacenElegido'
