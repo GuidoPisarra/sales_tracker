@@ -35,6 +35,11 @@ framework:
             policy: sliding_window
             limit: 5
             interval: '1 hour'
+        # Fotos de productos que sube un negocio.
+        fotos_subida:
+            policy: sliding_window
+            limit: 120
+            interval: '10 minutes'
 
 when@test:
     framework:
@@ -46,3 +51,4 @@ when@test:
             escaneo_codigo: { policy: sliding_window, limit: 10000, interval: '1 minute' }
             catalogo_publico: { policy: sliding_window, limit: 10000, interval: '1 minute' }
             solicitud_publica: { policy: sliding_window, limit: 10000, interval: '1 hour' }
+            fotos_subida: { policy: sliding_window, limit: 10000, interval: '10 minutes' }

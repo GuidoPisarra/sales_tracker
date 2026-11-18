@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use App\Repository\NegocioConfigRepository;
+use App\Service\Fotos\FotosService;
 
 /**
  * Catálogo online compartible: el administrador lo activa y elige un link
@@ -15,7 +16,7 @@ class CatalogoService
     public const SLUG = '/^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/';
     private const RESERVADOS = ['admin', 'api', 'app', 'kontia', 'login', 'registro', 'soporte', 'ayuda'];
 
-    public function __construct(private NegocioConfigRepository $repo)
+    public function __construct(private NegocioConfigRepository $repo, private FotosService $fotos)
     {
     }
 
@@ -34,6 +35,7 @@ class CatalogoService
             'mostrar_stock' => (int) $c['catalogo_mostrar_stock'] === 1,
             'sin_stock' => (int) $c['catalogo_sin_stock'] === 1,
             'nombre_sugerido' => $this->repo->nombreNegocio($idNegocio, 1),
+            'productos_sin_foto' => $this->fotos->productosSinFoto($idNegocio, (int) $c['catalogo_sucursal']),
         ];
     }
 
@@ -125,7 +127,15 @@ class CatalogoService
         }
         $mostrarStock = (int) $c['catalogo_mostrar_stock'] === 1;
         $sucursal = (int) $c['catalogo_sucursal'];
-        $productos = array_map(function ($p) use ($mostrarStock) {
+        $filas = $this->repo->productosCatalogo($idNegocio, $sucursal, (int) $c['catalogo_sin_stock'] !== 1);
+        try {
+            $fotos = $this->fotos->paraCatalogo($idNegocio, array_column($filas, 'id'));
+        } catch (\Throwable $th) {
+            // Sin la migración 0009 (o con el almacén caído) el catálogo sigue andando, sin fotos.
+            error_log('Catálogo sin fotos: ' . $th->getMessage());
+            $fotos = [];
+        }
+        $productos = array_map(function ($p) use ($mostrarStock, $fotos) {
             $item = [
                 'id' => (int) $p['id'],
                 'nombre' => $p['description'],
@@ -133,12 +143,13 @@ class CatalogoService
                 'talle' => $p['size'],
                 'precio' => (float) $p['sale_price'],
                 'disponible' => (int) $p['quantity'] > 0,
+                'fotos' => $fotos[(int) $p['id']] ?? [],
             ];
             if ($mostrarStock) {
                 $item['stock'] = max(0, (int) $p['quantity']);
             }
             return $item;
-        }, $this->repo->productosCatalogo($idNegocio, $sucursal, (int) $c['catalogo_sin_stock'] !== 1));
+        }, $filas);
 
         return [
             'slug' => $slug,

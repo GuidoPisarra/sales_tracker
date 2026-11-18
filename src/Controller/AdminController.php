@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Model\Usuario;
 use App\Repository\AdminRepository;
+use App\Repository\FotosRepository;
 use App\Repository\PlanRepository;
 use App\Repository\SuscripcionRepository;
 use App\Service\AuditoriaService;
@@ -45,16 +46,19 @@ class AdminController extends BaseController
     }
 
     #[Route('/resumen', name: 'app_admin_resumen', methods: ['GET'])]
-    public function resumen(AdminRepository $repo): JsonResponse
+    public function resumen(AdminRepository $repo, FotosRepository $fotos): JsonResponse
     {
         if ($r = $this->soloAdmin()) {
             return $r;
         }
-        return $this->respuesta(200, $repo->resumen(), []);
+        $resumen = $repo->resumen();
+        $uso = $this->usoFotos($fotos);
+        $resumen['fotos_mb'] = round(array_sum(array_column($uso, 'bytes')) / 1048576, 1);
+        return $this->respuesta(200, $resumen, []);
     }
 
     #[Route('/negocios', name: 'app_admin_negocios', methods: ['GET'])]
-    public function negocios(Request $request, AdminRepository $repo): JsonResponse
+    public function negocios(Request $request, AdminRepository $repo, FotosRepository $fotos): JsonResponse
     {
         if ($r = $this->soloAdmin()) {
             return $r;
@@ -63,11 +67,32 @@ class AdminController extends BaseController
         if ($estado !== '' && !in_array($estado, AdminRepository::ESTADOS, true)) {
             $estado = '';
         }
-        return $this->respuesta(200, $repo->negocios(trim((string) $request->query->get('q', '')), $estado), []);
+        return $this->respuesta(200, $this->conFotos($repo->negocios(trim((string) $request->query->get('q', '')), $estado), $fotos), []);
+    }
+
+    /** Disco usado por las fotos de cada negocio (vacío si falta la migración 0009). */
+    private function usoFotos(FotosRepository $fotos): array
+    {
+        try {
+            return $fotos->bytesPorNegocio();
+        } catch (\Throwable $th) {
+            return [];
+        }
+    }
+
+    private function conFotos(array $negocios, FotosRepository $fotos): array
+    {
+        $uso = $this->usoFotos($fotos);
+        return array_map(function ($n) use ($uso) {
+            $u = $uso[(int) $n['id_negocio']] ?? ['bytes' => 0, 'fotos' => 0];
+            $n['fotos'] = $u['fotos'];
+            $n['fotos_mb'] = round($u['bytes'] / 1048576, 1);
+            return $n;
+        }, $negocios);
     }
 
     #[Route('/negocios/{id}', name: 'app_admin_negocio', requirements: ['id' => '\d+'], methods: ['GET'])]
-    public function negocio(int $id, AdminRepository $repo): JsonResponse
+    public function negocio(int $id, AdminRepository $repo, FotosRepository $fotos): JsonResponse
     {
         if ($r = $this->soloAdmin()) {
             return $r;
@@ -75,7 +100,7 @@ class AdminController extends BaseController
         if (!$repo->existeNegocio($id)) {
             return $this->respuesta(404, [], ['No existe ese negocio.'], 404);
         }
-        $fila = array_values(array_filter($repo->negocios((string) $id), fn ($f) => (int) $f['id_negocio'] === $id))[0] ?? null;
+        $fila = array_values(array_filter($this->conFotos($repo->negocios((string) $id), $fotos), fn ($f) => (int) $f['id_negocio'] === $id))[0] ?? null;
         return $this->respuesta(200, [
             'negocio' => $fila,
             'pagos' => $repo->pagos($id),

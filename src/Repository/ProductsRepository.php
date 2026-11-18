@@ -277,6 +277,11 @@ class ProductsRepository extends BaseRepository
                     if (!$queryCrear->execute()) {
                         throw new \Exception('No se pudo crear el producto en la sucursal destino.');
                     }
+                    // Las fotos del catálogo pasan al producto nuevo (comparten los archivos).
+                    $pdo->prepare('INSERT INTO producto_foto (id_negocio, id_producto, archivo, miniatura, ancho, alto, bytes, orden, creada_en)
+                        SELECT id_negocio, :nuevo, archivo, miniatura, ancho, alto, bytes, orden, NOW() FROM producto_foto
+                        WHERE id_negocio = :n AND id_producto = :origen')
+                        ->execute([':nuevo' => (int) $pdo->lastInsertId(), ':n' => $prod['id_negocio'], ':origen' => $prod['id']]);
                 } else {
                     // Ya existe en la sucursal destino: se le suma el stock trasladado.
                     $queryNueva = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity + :quantity, p.activo = 0 WHERE p.id_negocio= :id_negocio AND p.code = :code AND sucursal = :sucursal');
