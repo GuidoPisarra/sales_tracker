@@ -100,6 +100,71 @@ class MercadoPagoClient
         return $this->pedir('GET', '/authorized_payments/' . rawurlencode($id));
     }
 
+    /**
+     * Pago único de un mes (Checkout Pro). El cliente paga con dinero en cuenta,
+     * tarjeta, etc. Devuelve id e init_point de la preferencia.
+     * Docs: https://www.mercadopago.com.ar/developers/es/reference/preferences/_checkout_preferences/post
+     */
+    public function crearPagoMensual(int $idNegocio, array $plan): array
+    {
+        $volver = Entorno::get('MP_BACK_URL', Entorno::get('APP_URL_FRONT') . '/mi-plan');
+        return $this->pedir('POST', '/checkout/preferences', [
+            'items' => [[
+                'id' => (string) $plan['codigo'],
+                'title' => 'Kontia - Plan ' . $plan['nombre'] . ' (1 mes)',
+                'quantity' => 1,
+                'unit_price' => (float) $plan['precio_mensual'],
+                'currency_id' => 'ARS',
+            ]],
+            'external_reference' => self::referenciaMensual($idNegocio, (string) $plan['codigo']),
+            'back_urls' => ['success' => $volver, 'pending' => $volver, 'failure' => $volver],
+            'auto_return' => 'approved',
+            'statement_descriptor' => 'KONTIA',
+        ]);
+    }
+
+    /**
+     * Pago (evento "payment"): se usa para los pagos mensuales sueltos.
+     */
+    public function obtenerPago(string $id): array
+    {
+        return $this->pedir('GET', '/v1/payments/' . rawurlencode($id));
+    }
+
+    /**
+     * Pagos recibidos en los últimos $dias días (para la conciliación diaria).
+     *
+     * @return array[]
+     */
+    public function pagosRecientes(int $dias = 3): array
+    {
+        $datos = $this->pedir('GET', '/v1/payments/search?' . http_build_query([
+            'sort' => 'date_created',
+            'criteria' => 'desc',
+            'range' => 'date_created',
+            'begin_date' => 'NOW-' . $dias . 'DAYS',
+            'end_date' => 'NOW',
+            'limit' => 100,
+        ]));
+        return $datos['results'] ?? [];
+    }
+
+    public static function referenciaMensual(int $idNegocio, string $codigoPlan): string
+    {
+        return 'kontia-mes:' . $idNegocio . ':' . $codigoPlan;
+    }
+
+    /**
+     * @return array{0: int, 1: string}|null [id_negocio, codigo_plan]
+     */
+    public static function leerReferenciaMensual(?string $ref): ?array
+    {
+        if ($ref && preg_match('/^kontia-mes:(\d+):([a-z0-9_-]+)$/', $ref, $m)) {
+            return [(int) $m[1], $m[2]];
+        }
+        return null;
+    }
+
     public static function referencia(int $idNegocio, string $codigoPlan): string
     {
         return 'kontia:' . $idNegocio . ':' . $codigoPlan;

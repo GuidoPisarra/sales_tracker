@@ -10,7 +10,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Tarea diaria (cron): revisa contra Mercado Pago el estado de cada débito
  * automático por si se perdió algún webhook, y avisa por mail a los negocios
- * cuya prueba gratis vence en 3 días.
+ * cuya prueba gratis o mes pagado vence en 3 días. También trae los pagos
+ * mensuales sueltos de los últimos días.
  */
 class ConciliarSuscripcionesCommand extends Command
 {
@@ -29,6 +30,7 @@ class ConciliarSuscripcionesCommand extends Command
     {
         $output->writeln('Suscripciones revisadas: ' . $this->cobros->conciliar());
         $output->writeln('Avisos de fin de prueba: ' . $this->cobros->avisarPruebasPorVencer(3));
+        $output->writeln('Avisos de pago mensual: ' . $this->cobros->avisarPagosMensuales(3));
         return Command::SUCCESS;
     }
 }

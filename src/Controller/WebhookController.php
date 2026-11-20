@@ -40,8 +40,12 @@ class WebhookController extends BaseController
                 case 'subscription_authorized_payment':
                     $cobros->aplicarCobro($mp->obtenerCobro($dataId));
                     break;
+                case 'payment':
+                    // Pago suelto: solo cuentan los pagos mensuales de Kontia.
+                    $cobros->aplicarPagoMensual($mp->obtenerPago($dataId));
+                    break;
                 default:
-                    // Otros avisos (pagos sueltos, etc.) no se usan.
+                    // Otros avisos no se usan.
                     break;
             }
         } catch (\Throwable $th) {

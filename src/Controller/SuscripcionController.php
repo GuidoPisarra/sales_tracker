@@ -49,8 +49,13 @@ class SuscripcionController extends BaseController
         if ($emailPago !== '' && !filter_var($emailPago, FILTER_VALIDATE_EMAIL)) {
             return $this->respuesta(400, [], ['El email de Mercado Pago no es válido.'], 400);
         }
+        // "debito" (débito automático, por defecto) o "mensual" (pago único de un mes).
+        $modo = (string) ($body['modo'] ?? 'debito');
+        if (!in_array($modo, ['debito', 'mensual'], true)) {
+            return $this->respuesta(400, [], ['Forma de pago no válida.'], 400);
+        }
         try {
-            $resultado = $cobros->elegirPlan($this->tenant()->idNegocioRequerido(), $plan, $emailPago !== '' ? $emailPago : $this->tenant()->usuario()->get_email());
+            $resultado = $cobros->elegirPlan($this->tenant()->idNegocioRequerido(), $plan, $emailPago !== '' ? $emailPago : $this->tenant()->usuario()->get_email(), $modo);
             return $this->respuesta(200, $resultado, []);
         } catch (\DomainException $e) {
             return $this->respuesta(400, [], [$e->getMessage()], 400);

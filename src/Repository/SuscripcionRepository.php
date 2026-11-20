@@ -46,6 +46,56 @@ class SuscripcionRepository extends BaseRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * Pagos mensuales que vencen en los próximos $dias días, sin aviso enviado.
+     *
+     * @return array[] con el email del titular
+     */
+    public function mensualesPorVencer(int $dias): array
+    {
+        $stmt = $this->get_bbdd()->prepare(
+            "SELECT s.id_negocio, s.periodo_hasta, MIN(u.email) AS email
+             FROM suscripcion s
+             JOIN user u ON u.id_negocio = s.id_negocio AND u.role LIKE '%ROLE_TITULAR%' AND (u.eliminado = 0 OR u.eliminado IS NULL)
+             WHERE s.estado = 'activa' AND s.modo_pago = 'mensual' AND s.exento_limites = 0 AND s.aviso_vencimiento = 0
+               AND s.periodo_hasta BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL :dias DAY)
+             GROUP BY s.id_negocio, s.periodo_hasta"
+        );
+        $stmt->bindValue(':dias', $dias, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Pagos mensuales ya vencidos (dentro de la última semana) sin el aviso de vencido.
+     *
+     * @return array[] con el email del titular
+     */
+    public function mensualesVencidos(): array
+    {
+        return $this->get_bbdd()->query(
+            "SELECT s.id_negocio, s.periodo_hasta, MIN(u.email) AS email
+             FROM suscripcion s
+             JOIN user u ON u.id_negocio = s.id_negocio AND u.role LIKE '%ROLE_TITULAR%' AND (u.eliminado = 0 OR u.eliminado IS NULL)
+             WHERE s.estado = 'activa' AND s.modo_pago = 'mensual' AND s.exento_limites = 0 AND s.aviso_vencimiento < 2
+               AND s.periodo_hasta BETWEEN DATE_SUB(NOW(), INTERVAL 7 DAY) AND NOW()
+             GROUP BY s.id_negocio, s.periodo_hasta"
+        )->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function marcarAvisoVencimiento(int $idNegocio, int $aviso): void
+    {
+        $this->get_bbdd()->prepare('UPDATE suscripcion SET aviso_vencimiento = :a WHERE id_negocio = :n')->execute([':a' => $aviso, ':n' => $idNegocio]);
+    }
+
+    public function estadoPago(string $mpId): ?string
+    {
+        $stmt = $this->get_bbdd()->prepare('SELECT estado FROM pago_suscripcion WHERE mp_id = :mp');
+        $stmt->execute([':mp' => $mpId]);
+        $estado = $stmt->fetchColumn();
+        return $estado === false ? null : (string) $estado;
+    }
+
     public function emailTitular(int $idNegocio): ?string
     {
         $stmt = $this->get_bbdd()->prepare(
@@ -63,7 +113,7 @@ class SuscripcionRepository extends BaseRepository
 
     public function actualizar(int $idNegocio, array $campos): void
     {
-        $permitidos = ['id_plan', 'estado', 'prueba_hasta', 'periodo_hasta', 'en_mora_desde', 'cancelada_en', 'mp_preapproval_id', 'id_plan_pendiente', 'exento_limites', 'aviso_prueba_enviado'];
+        $permitidos = ['id_plan', 'estado', 'prueba_hasta', 'periodo_hasta', 'en_mora_desde', 'cancelada_en', 'mp_preapproval_id', 'id_plan_pendiente', 'exento_limites', 'aviso_prueba_enviado', 'modo_pago', 'aviso_vencimiento'];
         $sets = [];
         $params = [':n' => $idNegocio];
         foreach ($campos as $campo => $valor) {

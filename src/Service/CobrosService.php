@@ -30,7 +30,7 @@ class CobrosService
      * Devuelve ['init_point' => url] si hay que ir al checkout, o
      * ['actualizado' => true] si ya tenía débito y solo se cambió el monto.
      */
-    public function elegirPlan(int $idNegocio, string $codigoPlan, string $emailPagador): array
+    public function elegirPlan(int $idNegocio, string $codigoPlan, string $emailPagador, string $modo = 'debito'): array
     {
         if (!$this->mp->configurado()) {
             throw new \DomainException('Los pagos todavía no están habilitados.');
@@ -40,6 +40,10 @@ class CobrosService
             throw new \DomainException('El plan elegido no existe.');
         }
         $s = $this->repo->porNegocio($idNegocio);
+
+        if ($modo === 'mensual') {
+            return $this->pagoMensual($idNegocio, $plan, $s);
+        }
 
         // Ya tiene débito autorizado: se cambia el monto y el plan rige desde ahora.
         if ($s && $s['mp_preapproval_id'] && $s['estado'] === 'activa') {
@@ -64,7 +68,7 @@ class CobrosService
     public function cancelar(int $idNegocio): void
     {
         $s = $this->repo->porNegocio($idNegocio);
-        if (!$s || !$s['mp_preapproval_id']) {
+        if (!$s || !$s['mp_preapproval_id'] || ($s['modo_pago'] ?? null) === 'mensual') {
             throw new \DomainException('No tenés un débito automático activo.');
         }
         $this->mp->cancelarSuscripcion($s['mp_preapproval_id']);
@@ -93,6 +97,12 @@ class CobrosService
         $idNegocio = (int) $s['id_negocio'];
         $plan = $ref ? $this->planes->porCodigo($ref[1]) : null;
 
+        // Quien paga mes a mes y dejó a medias un alta de débito: ese débito no
+        // autorizado (que Mercado Pago después pausa o cancela) no le cambia nada.
+        if (($s['modo_pago'] ?? null) === 'mensual' && ($pre['status'] ?? '') !== 'authorized') {
+            return;
+        }
+
         switch ($pre['status'] ?? '') {
             case 'authorized':
                 $cambios = [
@@ -102,6 +112,7 @@ class CobrosService
                     'cancelada_en' => null,
                     'id_plan_pendiente' => null,
                     'exento_limites' => 0,
+                    'modo_pago' => 'debito',
                 ];
                 if ($plan) {
                     $cambios['id_plan'] = (int) $plan['id'];
@@ -164,6 +175,105 @@ class CobrosService
     }
 
     /**
+     * Pago mes a mes: crea el pago único de un mes en Mercado Pago.
+     */
+    private function pagoMensual(int $idNegocio, array $plan, ?array $s): array
+    {
+        if ($s && $s['mp_preapproval_id'] && ($s['modo_pago'] ?? null) !== 'mensual' && $s['estado'] === 'activa') {
+            $actual = $this->mp->obtenerSuscripcion($s['mp_preapproval_id']);
+            if (($actual['status'] ?? '') === 'authorized') {
+                throw new \DomainException('Tenés el débito automático activo. Cancelalo primero para pasar a pagar mes a mes (no perdés los días ya pagados).');
+            }
+        }
+        $pref = $this->mp->crearPagoMensual($idNegocio, $plan);
+        $this->auditoria->registrar('checkout_mensual', ['plan' => $plan['codigo'], 'preferencia' => $pref['id'] ?? null], $idNegocio);
+        return ['init_point' => $pref['init_point'] ?? $pref['sandbox_init_point'] ?? null];
+    }
+
+    /**
+     * Aplica un pago suelto (objeto payment). Solo cuenta los pagos mensuales de
+     * Kontia (external_reference "kontia-mes:..."); los demás se ignoran.
+     * Cada pago aprobado suma un mes desde el vencimiento actual (o desde hoy si ya
+     * venció), así quien paga antes no pierde días.
+     */
+    public function aplicarPagoMensual(array $pago): void
+    {
+        $ref = MercadoPagoClient::leerReferenciaMensual($pago['external_reference'] ?? null);
+        if (!$ref || empty($pago['id'])) {
+            return;
+        }
+        [$idNegocio, $codigoPlan] = $ref;
+        $s = $this->repo->porNegocio($idNegocio);
+        $plan = $this->planes->porCodigo($codigoPlan);
+        if (!$s || !$plan) {
+            error_log('MP: pago mensual de negocio o plan desconocido ' . $pago['id']);
+            return;
+        }
+        $mpId = (string) $pago['id'];
+        $estadoPago = (string) ($pago['status'] ?? 'desconocido');
+        $yaAprobado = $this->repo->estadoPago($mpId) === 'approved';
+        $fecha = date('Y-m-d H:i:s', strtotime($pago['date_approved'] ?? $pago['date_created'] ?? 'now'));
+        $this->repo->registrarPago($idNegocio, $mpId, (float) ($pago['transaction_amount'] ?? 0), $estadoPago, $fecha, $pago);
+
+        if ($estadoPago !== 'approved' || $yaAprobado) {
+            if ($estadoPago !== 'approved') {
+                $this->auditoria->registrar('pago_mensual', ['mp_id' => $mpId, 'estado' => $estadoPago], $idNegocio);
+            }
+            return;
+        }
+        if ((float) ($pago['transaction_amount'] ?? 0) + 0.01 < (float) $plan['precio_mensual']) {
+            error_log('MP: pago mensual ' . $mpId . ' por menos que el precio del plan');
+            return;
+        }
+
+        $ahora = new \DateTimeImmutable();
+        $desde = $ahora;
+        foreach ([$s['periodo_hasta'] ?? null, ($s['estado'] ?? '') === 'prueba' ? ($s['prueba_hasta'] ?? null) : null] as $fechaHasta) {
+            if ($fechaHasta && new \DateTimeImmutable($fechaHasta) > $desde) {
+                $desde = new \DateTimeImmutable($fechaHasta);
+            }
+        }
+        $hasta = $desde->modify('+1 month');
+        $this->repo->actualizar($idNegocio, [
+            'estado' => 'activa',
+            'modo_pago' => 'mensual',
+            'id_plan' => (int) $plan['id'],
+            'id_plan_pendiente' => null,
+            'periodo_hasta' => $hasta->format('Y-m-d H:i:s'),
+            'en_mora_desde' => null,
+            'cancelada_en' => null,
+            'exento_limites' => 0,
+            'aviso_vencimiento' => 0,
+        ]);
+        $this->auditoria->registrar('pago_mensual', ['mp_id' => $mpId, 'estado' => 'approved', 'plan' => $codigoPlan, 'hasta' => $hasta->format('Y-m-d')], $idNegocio);
+        $this->avisarTitular($idNegocio, 'Recibimos tu pago de Kontia',
+            'Gracias. Tu plan ' . $plan['nombre'] . ' queda pago hasta el ' . $hasta->format('d/m/Y') . '. Te vamos a avisar unos días antes de que venza.');
+    }
+
+    /**
+     * Pagos mensuales: avisa 3 días antes del vencimiento y el día que vence.
+     */
+    public function avisarPagosMensuales(int $dias = 3): int
+    {
+        $n = 0;
+        foreach ($this->repo->mensualesPorVencer($dias) as $fila) {
+            $this->mail->enviarAviso($fila['email'], 'Tu plan de Kontia vence pronto',
+                'Tu plan está pago hasta el ' . date('d/m/Y', strtotime($fila['periodo_hasta']))
+                . '. Pagá el próximo mes desde Mi plan para seguir sin cortes. Si pagás antes, no perdés ningún día.', 'Pagar el próximo mes');
+            $this->repo->marcarAvisoVencimiento((int) $fila['id_negocio'], 1);
+            $n++;
+        }
+        foreach ($this->repo->mensualesVencidos() as $fila) {
+            $this->mail->enviarAviso($fila['email'], 'Tu plan de Kontia venció',
+                'Tu plan venció el ' . date('d/m/Y', strtotime($fila['periodo_hasta'])) . '. Tenés '
+                . Entorno::int('DIAS_GRACIA_MORA', 7) . ' días para pagar el próximo mes antes de que la Caja quede en solo lectura. Tus datos quedan guardados.', 'Pagar el próximo mes');
+            $this->repo->marcarAvisoVencimiento((int) $fila['id_negocio'], 2);
+            $n++;
+        }
+        return $n;
+    }
+
+    /**
      * Revisa contra Mercado Pago todas las suscripciones con débito (por si se perdió
      * un webhook). Devuelve cuántas revisó.
      */
@@ -177,6 +287,17 @@ class CobrosService
             } catch (\Throwable $th) {
                 error_log('MP conciliación ' . $s['id_negocio'] . ': ' . $th->getMessage());
             }
+        }
+        // Pagos mensuales de los últimos días, por si se perdió algún aviso.
+        try {
+            foreach ($this->mp->pagosRecientes(3) as $pago) {
+                if (MercadoPagoClient::leerReferenciaMensual($pago['external_reference'] ?? null)) {
+                    $this->aplicarPagoMensual($pago);
+                    $n++;
+                }
+            }
+        } catch (\Throwable $th) {
+            error_log('MP conciliación de pagos mensuales: ' . $th->getMessage());
         }
         return $n;
     }

@@ -11,3 +11,5 @@ services:
     App\Service\Facturas\LectorFacturas:
         alias: App\Service\Facturas\GeminiLectorFacturas
         public: true
+    App\Service\CobrosService:
+        public: true

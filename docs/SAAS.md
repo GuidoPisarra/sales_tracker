@@ -76,7 +76,8 @@ Crear un widget en Cloudflare Turnstile y completar `TURNSTILE_SITE_KEY` y
 1. En la aplicación > **Webhooks** > Configurar notificaciones > **Modo productivo**:
    - URL: `https://www.ventas-xpress.com.ar/api/webhooks/mercadopago`
    - Eventos: **Planes y suscripciones** (`subscription_preapproval` y
-     `subscription_authorized_payment`).
+     `subscription_authorized_payment`) y **Pagos** (`payment`, para el pago
+     mes a mes).
 2. Guardar y copiar la **clave secreta** que muestra a `MP_WEBHOOK_SECRET`.
 3. Botón "Simular notificación": como el id es de mentira, el back responde
    **500** (firma bien, pero Mercado Pago no conoce ese id). Un **401** quiere
@@ -116,6 +117,24 @@ Pago quedó conectado el Access Token.
 - Si algo falla, mirar `var/log` / el log de errores de Apache (`Webhook MP` y
   `Checkout MP`) y la tabla `webhook_evento`.
 
+### 5.5 Dos formas de pagar
+
+En "Elegir plan" el titular elige:
+
+- **Débito automático** (preapproval): Mercado Pago cobra solo cada mes. El email
+  del pagador tiene que ser el de su cuenta de Mercado Pago.
+- **Pago mes a mes** (Checkout Pro, migración 0010): un pago único por mes, con
+  dinero en cuenta, tarjeta, etc. Cada pago aprobado suma un mes desde el
+  vencimiento (o desde el fin de la prueba si todavía la tiene), así quien paga
+  antes no pierde días. 3 días antes y el día que vence le llega un mail; vencido,
+  tiene `DIAS_GRACIA_MORA` días y después queda en solo lectura. Si tiene el
+  débito activo, primero tiene que cancelarlo.
+
+Los pagos mes a mes llegan por el evento **Pagos** del webhook; la conciliación
+diaria además trae los pagos de los últimos 3 días (sirve en local, sin túnel:
+`php bin/console app:suscripciones:conciliar`). Una devolución no descuenta el
+mes: si se devuelve un pago, ajustar la fecha desde el panel de administración.
+
 El cobro solo se ofrece en la web. La app Android muestra el estado del plan
 pero no tiene botón de pago (Google Play exige su propio sistema de cobro para
 suscripciones dentro de la app).
@@ -125,7 +144,7 @@ suscripciones dentro de la app).
 Copiar `scripts/crontab.ejemplo` con `crontab -e`, ajustando la ruta. Incluye:
 
 - backup diario de la base (`scripts/backup-db.sh`),
-- conciliación con Mercado Pago y avisos de fin de prueba
+- conciliación con Mercado Pago, avisos de fin de prueba y de vencimiento del pago mes a mes
   (`php bin/console app:suscripciones:conciliar`),
 - prueba de restore mensual (`scripts/probar-restore.sh`).
 
@@ -147,7 +166,7 @@ Para los backups, crear `scripts/backup.conf` (no se sube al repo) con
 | POST `/api/usuario/google` | público | Entra o crea la cuenta con Google |
 | GET `/api/planes` | público | Planes a la venta |
 | GET `/api/suscripcion` | logueado | Mi plan: estado, uso, planes y pagos |
-| POST `/api/suscripcion/checkout` | titular | Link al checkout de Mercado Pago (`plan`, `email_pago` opcional) |
+| POST `/api/suscripcion/checkout` | titular | Link al checkout de Mercado Pago (`plan`, `modo` = `debito` o `mensual`, `email_pago` opcional) |
 | POST `/api/suscripcion/cancelar` | titular | Cancela el débito automático |
 | POST `/api/webhooks/mercadopago` | Mercado Pago | Avisos de suscripción y cobros |
 

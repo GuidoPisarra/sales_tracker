@@ -48,6 +48,15 @@ class SuscripcionService
                 // Si canceló pero tiene el mes pagado, sigue activa hasta el fin del período.
                 return ($s['periodo_hasta'] && new \DateTimeImmutable($s['periodo_hasta']) > $ahora) ? 'activa' : 'cancelada';
             default:
+                // Pago mes a mes: al vencer el mes pagado entra en mora (con los mismos
+                // días de gracia que un débito rechazado) y después queda suspendida.
+                if (($s['modo_pago'] ?? null) === 'mensual' && $s['periodo_hasta']) {
+                    $hasta = new \DateTimeImmutable($s['periodo_hasta']);
+                    if ($hasta < $ahora) {
+                        $fin = $hasta->modify('+' . Entorno::int('DIAS_GRACIA_MORA', 7) . ' days');
+                        return $fin < $ahora ? 'suspendida' : 'en_mora';
+                    }
+                }
                 return 'activa';
         }
     }
@@ -80,7 +89,8 @@ class SuscripcionService
             'dias_restantes_prueba' => $diasPrueba,
             'periodo_hasta' => $s['periodo_hasta'] ?? null,
             'sin_limites' => !empty($s['exento_limites']),
-            'con_debito_automatico' => !empty($s['mp_preapproval_id']) && ($s['estado'] ?? '') !== 'cancelada',
+            'con_debito_automatico' => !empty($s['mp_preapproval_id']) && ($s['estado'] ?? '') !== 'cancelada' && ($s['modo_pago'] ?? null) !== 'mensual',
+            'modo_pago' => $s['modo_pago'] ?? null,
         ];
         if ($conUso) {
             $resumen['uso'] = $this->repo->uso($idNegocio);

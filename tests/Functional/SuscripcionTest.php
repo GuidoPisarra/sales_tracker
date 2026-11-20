@@ -7,12 +7,19 @@ use App\Tests\KontiaTestCase;
 
 class SuscripcionTest extends KontiaTestCase
 {
-    private function mpFalso(array $preapprovals = [], array $cobros = []): \stdClass
+    private function mpFalso(array $preapprovals = [], array $cobros = [], array $pagos = []): \stdClass
     {
         $registro = new \stdClass();
         $registro->llamadas = [];
-        $falso = new class($preapprovals, $cobros, $registro) extends MercadoPagoClient {
-            public function __construct(private array $pre, private array $cob, private \stdClass $reg) {}
+        $falso = new class($preapprovals, $cobros, $registro, $pagos) extends MercadoPagoClient {
+            public function __construct(private array $pre, private array $cob, private \stdClass $reg, private array $pag = []) {}
+            public function crearPagoMensual(int $idNegocio, array $plan): array
+            {
+                $this->reg->llamadas[] = ['mensual', $idNegocio, $plan['codigo']];
+                return ['id' => 'pref-1', 'init_point' => 'https://mp.test/pago'];
+            }
+            public function obtenerPago(string $id): array { return $this->pag[$id]; }
+            public function pagosRecientes(int $dias = 3): array { return array_values($this->pag); }
             public function configurado(): bool { return true; }
             public function crearSuscripcion(int $idNegocio, array $plan, string $email): array
             {
@@ -178,6 +185,102 @@ class SuscripcionTest extends KontiaTestCase
 
         $this->assertSame(200, $this->webhook('subscription_authorized_payment', 'cobro-mal'));
         $this->assertSame('en_mora', $this->pdo()->query('SELECT estado FROM suscripcion WHERE id_negocio = 1')->fetchColumn());
+    }
+
+    public function testPagoMensualCreaElPagoYNoPisaUnDebitoActivo(): void
+    {
+        $mp = $this->mpFalso(['pre-1' => ['id' => 'pre-1', 'status' => 'authorized']]);
+        $this->crearNegocio(1, [1], 'pro', 'prueba', date('Y-m-d H:i:s', strtotime('+5 days')));
+        $this->crearUsuario('a@test.com', 1);
+        $token = $this->tokenPara('a@test.com');
+
+        [$codigo] = $this->pedir('POST', '/api/suscripcion/checkout', ['plan' => 'pro', 'modo' => 'otro'], $token);
+        $this->assertSame(400, $codigo);
+        [$codigo, $json] = $this->pedir('POST', '/api/suscripcion/checkout', ['plan' => 'starter', 'modo' => 'mensual'], $token);
+        $this->assertSame(200, $codigo, json_encode($json));
+        $this->assertSame('https://mp.test/pago', $json['datos']['init_point']);
+        $this->assertSame(['mensual', 1, 'starter'], $mp->llamadas[0]);
+        $this->assertNull($this->pdo()->query('SELECT mp_preapproval_id FROM suscripcion WHERE id_negocio = 1')->fetchColumn(), 'No crea débito');
+
+        // Con débito automático autorizado, primero hay que cancelarlo.
+        $this->pdo()->exec("UPDATE suscripcion SET estado = 'activa', mp_preapproval_id = 'pre-1' WHERE id_negocio = 1");
+        [$codigo] = $this->pedir('POST', '/api/suscripcion/checkout', ['plan' => 'pro', 'modo' => 'mensual'], $token);
+        $this->assertSame(400, $codigo);
+    }
+
+    public function testPagoMensualSumaUnMesYVence(): void
+    {
+        $pruebaHasta = date('Y-m-d H:i:s', strtotime('+5 days'));
+        $this->crearNegocio(1, [1], 'pro', 'prueba', $pruebaHasta);
+        $this->crearUsuario('a@test.com', 1);
+        $pago = fn (string $id, string $estado, float $monto = 30000) => [
+            'id' => $id, 'status' => $estado, 'transaction_amount' => $monto,
+            'external_reference' => 'kontia-mes:1:starter', 'date_approved' => date('c'),
+        ];
+        $this->mpFalso([], [], [
+            'pay-1' => $pago('pay-1', 'approved'),
+            'pay-2' => $pago('pay-2', 'approved'),
+            'pay-mal' => $pago('pay-mal', 'rejected'),
+            'pay-otro' => ['id' => 'pay-otro', 'status' => 'approved', 'transaction_amount' => 1, 'external_reference' => 'otra-cosa'],
+        ]);
+
+        $this->assertSame(200, $this->webhook('payment', 'pay-mal'));
+        $this->assertSame('prueba', $this->pdo()->query('SELECT estado FROM suscripcion WHERE id_negocio = 1')->fetchColumn());
+        $this->assertSame(200, $this->webhook('payment', 'pay-otro'), 'Pagos ajenos a Kontia se ignoran');
+
+        // Pagar durante la prueba no le hace perder los días que le quedan.
+        $this->assertSame(200, $this->webhook('payment', 'pay-1'));
+        $s = $this->pdo()->query('SELECT s.*, p.codigo FROM suscripcion s JOIN plan_suscripcion p ON p.id = s.id_plan WHERE id_negocio = 1')->fetch(\PDO::FETCH_ASSOC);
+        $this->assertSame('activa', $s['estado']);
+        $this->assertSame('mensual', $s['modo_pago']);
+        $this->assertSame('starter', $s['codigo']);
+        $esperado = (new \DateTimeImmutable($pruebaHasta))->modify('+1 month')->format('Y-m-d');
+        $this->assertSame($esperado, substr($s['periodo_hasta'], 0, 10));
+
+        // El mismo pago repetido (otro aviso o la conciliación) no suma dos veces.
+        $this->assertSame(200, $this->webhook('payment', 'pay-1'));
+        $this->assertSame($esperado, substr($this->pdo()->query('SELECT periodo_hasta FROM suscripcion WHERE id_negocio = 1')->fetchColumn(), 0, 10));
+
+        // Un segundo pago suma otro mes desde el vencimiento.
+        $this->assertSame(200, $this->webhook('payment', 'pay-2'));
+        $esperado2 = (new \DateTimeImmutable($esperado))->modify('+1 month')->format('Y-m-d');
+        $this->assertSame($esperado2, substr($this->pdo()->query('SELECT periodo_hasta FROM suscripcion WHERE id_negocio = 1')->fetchColumn(), 0, 10));
+
+        // Vencido: días de gracia y después solo lectura.
+        $token = $this->tokenPara('a@test.com');
+        $this->pdo()->exec("UPDATE suscripcion SET periodo_hasta = DATE_SUB(NOW(), INTERVAL 2 DAY) WHERE id_negocio = 1");
+        [, $json] = $this->pedir('GET', '/api/suscripcion', null, $token);
+        $this->assertSame('en_mora', $json['datos']['estado']);
+        $this->assertSame('mensual', $json['datos']['modo_pago']);
+        $this->assertFalse($json['datos']['con_debito_automatico']);
+        $this->pdo()->exec("UPDATE suscripcion SET periodo_hasta = DATE_SUB(NOW(), INTERVAL 8 DAY) WHERE id_negocio = 1");
+        [$codigo, $json] = $this->pedir('POST', '/api/proveedores/proveedor', ['nombre' => 'P'], $token);
+        $this->assertSame(402, $codigo);
+        $this->assertSame('solo_lectura', $json['datos']['codigo']);
+    }
+
+    public function testDebitoAbandonadoNoAfectaAlQuePagaMesAMes(): void
+    {
+        $this->crearNegocio(1, [1], 'pro');
+        $hasta = date('Y-m-d H:i:s', strtotime('+10 days'));
+        $this->pdo()->exec("UPDATE suscripcion SET modo_pago = 'mensual', periodo_hasta = '$hasta', mp_preapproval_id = 'pre-viejo' WHERE id_negocio = 1");
+        $this->mpFalso(['pre-viejo' => ['id' => 'pre-viejo', 'status' => 'cancelled', 'external_reference' => 'kontia:1:pro']]);
+        $this->assertSame(200, $this->webhook('subscription_preapproval', 'pre-viejo'));
+        $this->assertSame('activa', $this->pdo()->query('SELECT estado FROM suscripcion WHERE id_negocio = 1')->fetchColumn());
+    }
+
+    public function testAvisosDePagoMensual(): void
+    {
+        $this->mpFalso();
+        $this->crearNegocio(1, [1], 'pro');
+        $this->crearUsuario('a@test.com', 1);
+        $this->pdo()->exec("UPDATE suscripcion SET modo_pago = 'mensual', periodo_hasta = DATE_ADD(NOW(), INTERVAL 2 DAY) WHERE id_negocio = 1");
+        $cobros = static::getContainer()->get(\App\Service\CobrosService::class);
+        $this->assertSame(1, $cobros->avisarPagosMensuales(3));
+        $this->assertSame(0, $cobros->avisarPagosMensuales(3), 'Un solo aviso por vencimiento');
+        $this->pdo()->exec("UPDATE suscripcion SET periodo_hasta = DATE_SUB(NOW(), INTERVAL 1 DAY) WHERE id_negocio = 1");
+        $this->assertSame(1, $cobros->avisarPagosMensuales(3));
+        $this->assertSame(0, $cobros->avisarPagosMensuales(3));
     }
 
     public function testFirmaDeMercadoPago(): void
