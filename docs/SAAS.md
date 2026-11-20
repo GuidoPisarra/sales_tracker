@@ -132,7 +132,8 @@ En "Elegir plan" el titular elige:
 
 Los pagos mes a mes llegan por el evento **Pagos** del webhook; la conciliación
 diaria además trae los pagos de los últimos 3 días (sirve en local, sin túnel:
-`php bin/console app:suscripciones:conciliar`). Una devolución no descuenta el
+`php bin/console app:suscripciones:conciliar`). Igual, al volver de Mercado Pago a
+Mi plan el front llama a `/api/suscripcion/sincronizar` y el plan se actualiza solo. Una devolución no descuenta el
 mes: si se devuelve un pago, ajustar la fecha desde el panel de administración.
 
 El cobro solo se ofrece en la web. La app Android muestra el estado del plan
@@ -144,7 +145,8 @@ suscripciones dentro de la app).
 Copiar `scripts/crontab.ejemplo` con `crontab -e`, ajustando la ruta. Incluye:
 
 - backup diario de la base (`scripts/backup-db.sh`),
-- conciliación con Mercado Pago, avisos de fin de prueba y de vencimiento del pago mes a mes
+- conciliación con Mercado Pago, avisos de fin de prueba y de vencimiento del pago mes a mes,
+  cada hora (además, Mi plan sincroniza su negocio al volver de Mercado Pago)
   (`php bin/console app:suscripciones:conciliar`),
 - prueba de restore mensual (`scripts/probar-restore.sh`).
 
@@ -167,6 +169,7 @@ Para los backups, crear `scripts/backup.conf` (no se sube al repo) con
 | GET `/api/planes` | público | Planes a la venta |
 | GET `/api/suscripcion` | logueado | Mi plan: estado, uso, planes y pagos |
 | POST `/api/suscripcion/checkout` | titular | Link al checkout de Mercado Pago (`plan`, `modo` = `debito` o `mensual`, `email_pago` opcional) |
+| POST `/api/suscripcion/sincronizar` | logueado | Trae ya de Mercado Pago el estado de su negocio (`payment_id` opcional); lo llama Mi plan al volver de pagar |
 | POST `/api/suscripcion/cancelar` | titular | Cancela el débito automático |
 | POST `/api/webhooks/mercadopago` | Mercado Pago | Avisos de suscripción y cobros |
 

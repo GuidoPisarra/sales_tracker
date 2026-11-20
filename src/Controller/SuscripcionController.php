@@ -65,6 +65,25 @@ class SuscripcionController extends BaseController
         }
     }
 
+    /**
+     * Al volver de Mercado Pago, "Mi plan" pide traer el estado de este negocio
+     * ya mismo (sin esperar el webhook ni el cron). Devuelve el resumen actualizado.
+     */
+    #[Route('/api/suscripcion/sincronizar', name: 'app_suscripcion_sincronizar', methods: ['POST'])]
+    public function sincronizar(Request $request, CobrosService $cobros, SuscripcionService $suscripciones): JsonResponse
+    {
+        $idNegocio = $this->tenant()->idNegocioRequerido();
+        $body = json_decode($request->getContent(), true) ?: [];
+        $idPago = preg_replace('/\D/', '', (string) ($body['payment_id'] ?? ''));
+        try {
+            $cobros->sincronizarNegocio($idNegocio, $idPago !== '' ? $idPago : null);
+        } catch (\Throwable $th) {
+            // Si Mercado Pago no responde, igual queda el webhook y el cron.
+            error_log('Sincronizar MP ' . $idNegocio . ': ' . $th->getMessage());
+        }
+        return $this->respuesta(200, $suscripciones->resumen($idNegocio), []);
+    }
+
     #[Route('/api/suscripcion/cancelar', name: 'app_suscripcion_cancelar', methods: ['POST'])]
     public function cancelar(CobrosService $cobros): JsonResponse
     {

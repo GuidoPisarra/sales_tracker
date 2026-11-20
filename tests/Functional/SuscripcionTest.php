@@ -20,6 +20,10 @@ class SuscripcionTest extends KontiaTestCase
             }
             public function obtenerPago(string $id): array { return $this->pag[$id]; }
             public function pagosRecientes(int $dias = 3): array { return array_values($this->pag); }
+            public function pagosPorReferencia(string $referencia): array
+            {
+                return array_values(array_filter($this->pag, fn ($p) => ($p['external_reference'] ?? '') === $referencia));
+            }
             public function configurado(): bool { return true; }
             public function crearSuscripcion(int $idNegocio, array $plan, string $email): array
             {
@@ -257,6 +261,28 @@ class SuscripcionTest extends KontiaTestCase
         [$codigo, $json] = $this->pedir('POST', '/api/proveedores/proveedor', ['nombre' => 'P'], $token);
         $this->assertSame(402, $codigo);
         $this->assertSame('solo_lectura', $json['datos']['codigo']);
+    }
+
+    public function testSincronizarAlVolverDeMercadoPago(): void
+    {
+        $this->crearNegocio(1, [1], 'pro', 'prueba', date('Y-m-d H:i:s', strtotime('-1 day')));
+        $this->crearNegocio(2, [1], 'pro', 'prueba', date('Y-m-d H:i:s', strtotime('-1 day')));
+        $this->crearUsuario('a@test.com', 1);
+        $this->crearUsuario('b@test.com', 2);
+        $this->mpFalso([], [], [
+            '111' => ['id' => '111', 'status' => 'approved', 'transaction_amount' => 40000, 'external_reference' => 'kontia-mes:1:pro', 'date_approved' => date('c')],
+        ]);
+
+        // Otro negocio no puede aplicarse el pago ajeno.
+        [$codigo, $json] = $this->pedir('POST', '/api/suscripcion/sincronizar', ['payment_id' => '111'], $this->tokenPara('b@test.com'));
+        $this->assertSame(200, $codigo);
+        $this->assertSame('prueba_vencida', $json['datos']['estado']);
+
+        // Sin payment_id igual encuentra el pago por la referencia del negocio.
+        [$codigo, $json] = $this->pedir('POST', '/api/suscripcion/sincronizar', [], $this->tokenPara('a@test.com'));
+        $this->assertSame(200, $codigo);
+        $this->assertSame('activa', $json['datos']['estado']);
+        $this->assertSame('mensual', $json['datos']['modo_pago']);
     }
 
     public function testDebitoAbandonadoNoAfectaAlQuePagaMesAMes(): void

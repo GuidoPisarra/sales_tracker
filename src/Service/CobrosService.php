@@ -251,6 +251,38 @@ class CobrosService
     }
 
     /**
+     * Trae ya mismo de Mercado Pago el estado de un solo negocio: su débito (si
+     * tiene) y sus pagos mes a mes. Lo usa "Mi plan" al volver de pagar, así no
+     * hay que esperar el webhook ni la conciliación del cron.
+     */
+    public function sincronizarNegocio(int $idNegocio, ?string $idPago = null): void
+    {
+        if (!$this->mp->configurado()) {
+            return;
+        }
+        $s = $this->repo->porNegocio($idNegocio);
+        if (!$s) {
+            return;
+        }
+        if ($idPago !== null && $idPago !== '') {
+            $pago = $this->mp->obtenerPago($idPago);
+            $ref = MercadoPagoClient::leerReferenciaMensual($pago['external_reference'] ?? null);
+            // Solo pagos de este negocio (no se puede aplicar el pago de otro).
+            if ($ref && $ref[0] === $idNegocio) {
+                $this->aplicarPagoMensual($pago);
+            }
+        }
+        if ($s['mp_preapproval_id']) {
+            $this->aplicarSuscripcion($this->mp->obtenerSuscripcion($s['mp_preapproval_id']));
+        }
+        foreach ($this->planes->publicos() as $plan) {
+            foreach ($this->mp->pagosPorReferencia(MercadoPagoClient::referenciaMensual($idNegocio, (string) $plan['codigo'])) as $pago) {
+                $this->aplicarPagoMensual($pago);
+            }
+        }
+    }
+
+    /**
      * Pagos mensuales: avisa 3 días antes del vencimiento y el día que vence.
      */
     public function avisarPagosMensuales(int $dias = 3): int

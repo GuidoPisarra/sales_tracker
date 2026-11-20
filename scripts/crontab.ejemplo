@@ -5,8 +5,9 @@ MAILTO=""
 # Backup diario de la base a las 3:30.
 30 3 * * * /ruta/a/sales_tracker/scripts/backup-db.sh >> /var/log/kontia-backup.log 2>&1
 
-# Conciliación con Mercado Pago y avisos de fin de prueba, todos los días a las 9.
-0 9 * * * cd /ruta/a/sales_tracker && APP_ENV=prod php bin/console app:suscripciones:conciliar >> /var/log/kontia-cron.log 2>&1
+# Conciliación con Mercado Pago (débitos y pagos mes a mes que no hayan llegado por
+# webhook) y avisos de fin de prueba y de vencimiento, cada hora (los mails no se repiten).
+15 * * * * cd /ruta/a/sales_tracker && APP_ENV=prod php bin/console app:suscripciones:conciliar >> /var/log/kontia-cron.log 2>&1
 
 # Prueba de restore el primer domingo de cada mes a las 5.
 0 5 1-7 * 0 /ruta/a/sales_tracker/scripts/probar-restore.sh >> /var/log/kontia-backup.log 2>&1

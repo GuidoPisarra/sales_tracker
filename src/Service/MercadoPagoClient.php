@@ -149,6 +149,22 @@ class MercadoPagoClient
         return $datos['results'] ?? [];
     }
 
+    /**
+     * Pagos con un external_reference dado (los pagos mes a mes de un negocio y plan).
+     *
+     * @return array[]
+     */
+    public function pagosPorReferencia(string $referencia): array
+    {
+        $datos = $this->pedir('GET', '/v1/payments/search?' . http_build_query([
+            'external_reference' => $referencia,
+            'sort' => 'date_created',
+            'criteria' => 'desc',
+            'limit' => 20,
+        ]));
+        return $datos['results'] ?? [];
+    }
+
     public static function referenciaMensual(int $idNegocio, string $codigoPlan): string
     {
         return 'kontia-mes:' . $idNegocio . ':' . $codigoPlan;
