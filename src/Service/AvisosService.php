@@ -15,6 +15,26 @@ use App\Repository\SalesProductRepository;
  */
 class AvisosService
 {
+    /**
+     * Novedades de Kontia para mostrar en Inicio. Se ven entre "desde" y "hasta"
+     * (inclusive). El id es fijo: si el usuario la cierra, no vuelve a aparecer.
+     * Para anunciar algo nuevo, agregar una entrada acá.
+     */
+    private const NOVEDADES = [
+        [
+            'clave' => 'catalogo_fotos',
+            'desde' => '2026-11-21',
+            'hasta' => '2026-12-31',
+            'solo_titular' => true,
+            'titulo' => 'Novedad: fotos en tu catálogo online',
+            'mensaje' => 'Mejoramos el catálogo online: ahora carga rápido aunque tengas miles de productos, y podés '
+                . 'agregarles fotos desde Productos → Editar. Tus clientes las ven al entrar a tu catálogo.',
+            'tipo' => 'exito',
+            'ruta' => '/catalogo-online',
+            'texto_ruta' => 'Ver catálogo',
+        ],
+    ];
+
     private $rep_products;
     private $preciosService;
     private $rep_sales;
@@ -30,6 +50,20 @@ class AvisosService
     {
         $avisos = [];
         $hoy = (new \DateTime('now', new \DateTimeZone('America/Argentina/Buenos_Aires')))->format('Y-m-d');
+
+        foreach (self::NOVEDADES as $n) {
+            if ($hoy < $n['desde'] || $hoy > $n['hasta'] || ($n['solo_titular'] && !$esTitular)) {
+                continue;
+            }
+            $avisos[] = [
+                'id' => $this->idAviso('novedad_' . $n['clave'], $n['desde'], 1),
+                'titulo' => $n['titulo'],
+                'mensaje' => $n['mensaje'],
+                'tipo' => $n['tipo'],
+                'ruta' => $n['ruta'],
+                'texto_ruta' => $n['texto_ruta'],
+            ];
+        }
 
         $sinStock = $this->rep_products->contarSinStock($idNegocio);
         if ($sinStock > 0) {
