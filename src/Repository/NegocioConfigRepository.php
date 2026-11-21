@@ -72,7 +72,7 @@ class NegocioConfigRepository extends BaseRepository
         if ($soloConStock) {
             $sql .= ' AND quantity > 0';
         }
-        $stmt = $this->get_bbdd()->prepare($sql . ' ORDER BY description LIMIT 2000');
+        $stmt = $this->get_bbdd()->prepare($sql . ' ORDER BY description LIMIT 5000');
         $stmt->execute([':n' => $idNegocio, ':s' => $sucursal]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
