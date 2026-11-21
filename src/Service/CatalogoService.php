@@ -24,7 +24,14 @@ class CatalogoService
     public function config(int $idNegocio, array $sucursales = []): array
     {
         $c = $this->repo->config($idNegocio);
-        $c['catalogo_sucursal'] = self::sucursalEfectiva((int) $c['catalogo_sucursal'], $sucursales);
+        // Sucursal principal = la de número más bajo: 0 ("Casa central") en los
+        // negocios anteriores a los planes, 1 en las cuentas nuevas. Suponer 1
+        // sugería el nombre y los productos de otra sucursal (ej. "sucursal-claromeco").
+        $principal = $sucursales !== [] ? min($sucursales) : 1;
+        // Mientras el catálogo nunca se guardó (sin link), catalogo_sucursal es el
+        // 1 por defecto de la tabla, no una elección: se propone la principal.
+        $guardada = empty($c['catalogo_slug']) ? $principal : (int) $c['catalogo_sucursal'];
+        $c['catalogo_sucursal'] = self::sucursalEfectiva($guardada, $sucursales);
         return [
             'activo' => (int) $c['catalogo_activo'] === 1,
             'slug' => $c['catalogo_slug'],
@@ -34,7 +41,7 @@ class CatalogoService
             'sucursal' => (int) $c['catalogo_sucursal'],
             'mostrar_stock' => (int) $c['catalogo_mostrar_stock'] === 1,
             'sin_stock' => (int) $c['catalogo_sin_stock'] === 1,
-            'nombre_sugerido' => $this->repo->nombreNegocio($idNegocio, 1),
+            'nombre_sugerido' => $this->repo->nombreNegocio($idNegocio, $principal),
             'productos_sin_foto' => $this->fotos->productosSinFoto($idNegocio, (int) $c['catalogo_sucursal']),
         ];
     }
