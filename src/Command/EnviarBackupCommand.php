@@ -60,6 +60,12 @@ class EnviarBackupCommand extends Command
         $tamano = $mb < 1 ? round(strlen($contenido) / 1024) . ' KB' : round($mb, 1) . ' MB';
         $cifrado = str_ends_with($nombre, '.gpg');
 
+        if (!$cifrado) {
+            // Un backup sin cifrar en un buzón de mail expone los datos de todos los clientes.
+            $output->writeln('<error>No mando backups sin cifrar: cargá BACKUP_GPG_PASS en scripts/backup.conf.</error>');
+            return Command::FAILURE;
+        }
+
         if ($mb > $maxMb) {
             $ok = $this->mail->enviarAdmin($destinos, 'Backup demasiado grande para mandarlo por mail', [
                 'Archivo' => $nombre,
@@ -68,9 +74,8 @@ class EnviarBackupCommand extends Command
             ]);
         } else {
             $texto = 'Backup diario de la base de Kontia: ' . $nombre . ' (' . $tamano . ').' . "\n"
-                . ($cifrado
-                    ? 'Está cifrado con BACKUP_GPG_PASS. Para abrirlo: gpg -d ' . $nombre . ' | gunzip > backup.sql'
-                    : 'Atención: no está cifrado. Cargá BACKUP_GPG_PASS en scripts/backup.conf.')
+                . 'Está cifrado con BACKUP_GPG_PASS. Para restaurarlo en el servidor: '
+                . 'gpg -d ' . $nombre . ' | gunzip | mysql --defaults-extra-file=/root/.my.cnf NOMBRE_BASE (pisa la base).'
                 . "\n" . 'Guardá este mail: es tu copia fuera del servidor.';
             $ok = $this->mail->enviarConAdjunto($destinos, 'Backup ' . date('Y-m-d'), $texto, $contenido, $nombre);
         }
