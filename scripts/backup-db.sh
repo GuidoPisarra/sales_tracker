@@ -10,6 +10,7 @@
 #   BACKUP_DIR=/var/backups/kontia
 #   BACKUP_GPG_PASS=una-clave-larga      # vacío = sin cifrar
 #   RCLONE_DESTINO=r2:kontia-backups     # vacío = solo copia local
+#   BACKUP_EMAIL=yo@mail.com             # vacío = no se manda por mail (exige BACKUP_GPG_PASS)
 #   RETENCION_DIARIA=30
 #   RETENCION_MENSUAL=12
 set -euo pipefail
@@ -55,3 +56,16 @@ if [ -n "${RCLONE_DESTINO:-}" ]; then
 fi
 
 echo "Backup OK: $ARCHIVO ($(du -h "$ARCHIVO" | cut -f1))"
+
+# Copia por mail (otra forma de sacarlo del VPS). El comando corre como www-data,
+# igual que Apache, para no dejar archivos de root en var/; el backup le llega por stdin.
+if [ -n "${BACKUP_EMAIL:-}" ]; then
+  if [ -z "${BACKUP_GPG_PASS:-}" ]; then
+    echo "No se manda por mail: el backup no está cifrado (falta BACKUP_GPG_PASS)" >&2
+    exit 1
+  fi
+  COMO=()
+  [ "$(id -u)" = "0" ] && COMO=(sudo -u www-data)
+  (cd "$(dirname "$DIR")" && "${COMO[@]}" php bin/console app:backup:enviar "$BACKUP_EMAIL" \
+      --nombre="$(basename "$ARCHIVO")" < "$ARCHIVO")
+fi

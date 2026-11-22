@@ -161,6 +161,13 @@ Para los backups, crear `scripts/backup.conf` (no se sube al repo) con
 `BACKUP_DIR`, `BACKUP_GPG_PASS` y `RCLONE_DESTINO` para copiar fuera del VPS
 (Cloudflare R2, Backblaze B2 o S3).
 
+Sin almacenamiento externo, el backup puede salir del VPS por mail: con
+`BACKUP_EMAIL=yo@mail.com` (y `BACKUP_GPG_PASS`, obligatorio) en `backup.conf`,
+`backup-db.sh` lo manda adjunto con `app:backup:enviar` usando el mismo
+`MAILER_DSN` de la app. Se niega a mandar un backup sin cifrar y uno de más de
+18 MB (límite de adjuntos de Gmail). Restaurar:
+`gpg -d ARCHIVO.sql.gz.gpg | gunzip | mysql --defaults-extra-file=/root/.my.cnf saleTracker`.
+
 ## 7. Endpoints nuevos (para el front)
 
 | Método y ruta | Quién | Qué hace |
