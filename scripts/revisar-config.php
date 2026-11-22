@@ -142,7 +142,9 @@ if ($mailer === '' || str_starts_with($mailer, 'null://')) {
     linea('ok', 'MAILER_DSN = ' . preg_replace('#//([^:@/]+):[^@]+@#', '//$1:****@', $mailer));
 }
 requerida('MAIL_FROM', 'el remitente de los mails');
-$v('AVISAR_ERRORES') !== '' ? linea('ok', 'AVISAR_ERRORES = ' . $v('AVISAR_ERRORES')) : linea('aviso', 'AVISAR_ERRORES vacío', 'Opcional: email al que llega un aviso cuando la API da error 500.');
+$v('AVISAR_ERRORES') === '0'
+    ? linea('aviso', 'Avisos de errores 500 apagados (AVISAR_ERRORES=0)', 'Con 1 (o vacío) llega un mail a ADMIN_EMAILS cuando la API falla.')
+    : linea('ok', 'Avisos de errores 500 por mail a ADMIN_EMAILS: prendidos');
 
 // ---------------------------------------------------------------- registro y SaaS
 
