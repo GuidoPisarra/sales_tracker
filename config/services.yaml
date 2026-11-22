@@ -62,6 +62,9 @@ services:
     App\Command\MigracionesCommand:
         arguments:
             $projectDir: '%kernel.project_dir%'
+    App\Command\VerificarConfigCommand:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
 
     # Lectura de facturas con IA (para cambiar de proveedor, apuntar a otra implementación).
     App\Service\Facturas\LectorFacturas: '@App\Service\Facturas\GeminiLectorFacturas'

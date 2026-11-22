@@ -4,6 +4,12 @@ Esta guía cubre lo que hay que configurar en el VPS para usar el registro
 self-service, el ingreso con Google, los planes y el cobro con Mercado Pago.
 Todo corre en el VPS actual, sin Docker.
 
+Para ver qué falta configurar (variables, base, JWT, mail, Google, Mercado Pago,
+datos legales y fotos): `APP_ENV=prod php bin/console app:config:verificar`.
+Dice además si Mercado Pago está en **producción** (cobra de verdad) o en
+**prueba** (token `TEST-` o cuenta de usuario de prueba). No cambia nada;
+`--sin-red` saltea la consulta a Mercado Pago.
+
 ## 1. Antes del primer deploy
 
 1. Copiar `.env.dist` a `.env` (o completar el `.env` que ya existe) con las
