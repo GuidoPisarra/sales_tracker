@@ -10,6 +10,8 @@
 #   BACKUP_DIR=/var/backups/kontia
 #   BACKUP_GPG_PASS=una-clave-larga      # vacío = sin cifrar
 #   RCLONE_DESTINO=r2:kontia-backups     # vacío = solo copia local
+#   BACKUP_EMAIL=vos@gmail.com           # vacío = no se manda por mail
+#   APP_USER=www-data                    # usuario que corre la app (para mandar el mail)
 #   RETENCION_DIARIA=30
 #   RETENCION_MENSUAL=12
 set -euo pipefail
@@ -52,6 +54,14 @@ ls -1t "$BACKUP_DIR/mensual/"* 2>/dev/null | tail -n +"$((RETENCION_MENSUAL + 1)
 # Copia fuera del VPS (un backup en el mismo disco no sirve si se pierde el VPS).
 if [ -n "${RCLONE_DESTINO:-}" ]; then
   rclone copy "$BACKUP_DIR" "$RCLONE_DESTINO" --max-age 48h
+fi
+
+# Copia por mail (usa el mismo mailer de Kontia). Si falla no corta el backup.
+if [ -n "${BACKUP_EMAIL:-}" ]; then
+  APP_DIR="$(cd "$DIR/.." && pwd)"
+  ( cd "$APP_DIR" && sudo -u "${APP_USER:-www-data}" env APP_ENV=prod \
+      php bin/console app:backup:enviar "$(basename "$ARCHIVO")" --para="$BACKUP_EMAIL" < "$ARCHIVO" ) \
+    || echo "AVISO: no se pudo mandar el backup por mail" >&2
 fi
 
 echo "Backup OK: $ARCHIVO ($(du -h "$ARCHIVO" | cut -f1))"

@@ -103,8 +103,21 @@ class MailService
         return $this->enviar($para, '[Kontia] ' . $asunto, $html);
     }
 
+    /**
+     * Mail interno con un archivo adjunto (por ejemplo, el backup diario de la base).
+     *
+     * @param string[] $para
+     */
+    public function enviarConAdjunto(array $para, string $asunto, string $texto, string $contenido, string $nombreArchivo): bool
+    {
+        $e = fn ($s) => htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8');
+        $html = '<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#222">'
+            . '<h2 style="color:#2a8253">Kontia</h2><p>' . nl2br($e($texto)) . '</p></div>';
+        return $this->enviar($para, '[Kontia] ' . $asunto, $html, [[$contenido, $nombreArchivo]]);
+    }
+
     /** @param string|string[] $para */
-    private function enviar(string|array $para, string $asunto, string $html): bool
+    private function enviar(string|array $para, string $asunto, string $html, array $adjuntos = []): bool
     {
         $destino = is_array($para) ? implode(', ', $para) : $para;
         try {
@@ -114,6 +127,9 @@ class MailService
                 ->subject($asunto)
                 ->html($html)
                 ->text(strip_tags(str_replace(['<br>', '</p>'], "\n", $html)));
+            foreach ($adjuntos as [$contenido, $nombre]) {
+                $email->attach($contenido, $nombre, 'application/octet-stream');
+            }
             $this->mailer->send($email);
             return true;
         } catch (\Throwable $th) {
