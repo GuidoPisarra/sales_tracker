@@ -13,6 +13,7 @@
         "ext-pdo_mysql": "*",
         "doctrine/annotations": "^1.14",
         "doctrine/collections": "^1.8",
+        "lbuchs/webauthn": "^2.2",
         "lexik/jwt-authentication-bundle": "^2.16",
         "nelmio/cors-bundle": "^2.3",
         "symfony/console": "5.4.*",
