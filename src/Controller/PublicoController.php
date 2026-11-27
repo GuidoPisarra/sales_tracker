@@ -3,11 +3,16 @@
 namespace App\Controller;
 
 use App\Repository\AdminRepository;
+use App\Security\UserChecker;
+use App\Security\UsuariosProvider;
 use App\Service\AuditoriaService;
+use App\Service\DemoService;
 use App\Service\Entorno;
 use App\Service\MailService;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Lexik\Bundle\JWTAuthenticationBundle\Security\Http\Authentication\AuthenticationSuccessHandler;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Annotation\Route;
 
@@ -65,5 +70,26 @@ class PublicoController extends BaseController
         ], $idNegocio);
         $mail->enviarConfirmacionSolicitud($email, $tipo, $codigo);
         return $this->respuesta(201, ['codigo' => $codigo], [], 201);
+    }
+
+    /**
+     * "Probar sin registrarme": entra al negocio de ejemplo compartido con la
+     * misma respuesta que el login (token + datos), con demo = true.
+     */
+    #[Route('/api/publico/demo', name: 'app_publico_demo', methods: ['POST'])]
+    public function demo(Request $request, DemoService $demo, UsuariosProvider $provider, UserChecker $checker, AuthenticationSuccessHandler $exito, RateLimiterFactory $demoLimiter): Response
+    {
+        if (!$demoLimiter->create($request->getClientIp() ?? 'sin-ip')->consume()->isAccepted()) {
+            return $this->respuesta(429, [], ['Demasiados ingresos seguidos. Probá de nuevo en un rato.'], 429);
+        }
+        try {
+            $demo->asegurar();
+            $usuario = $provider->loadUserByIdentifier(DemoService::email());
+            $checker->checkPreAuth($usuario);
+        } catch (\Throwable $th) {
+            error_log('Demo: ' . $th->getMessage());
+            return $this->respuesta(503, [], ['La tienda de ejemplo no está disponible ahora. Probá de nuevo en un rato.'], 503);
+        }
+        return $exito->handleAuthenticationSuccess($usuario);
     }
 }

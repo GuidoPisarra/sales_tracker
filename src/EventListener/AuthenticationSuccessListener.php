@@ -91,6 +91,8 @@ class AuthenticationSuccessListener
             'precios_desactualizados' => $preciosDesactualizados,
             // Dueños de Kontia (ADMIN_EMAILS): el front muestra el panel de administración.
             'admin_kontia' => \App\Controller\AdminController::esAdminKontia($user->get_email()),
+            // Negocio de ejemplo de "Probar sin registrarme" (ver DemoService).
+            'demo' => \App\Service\DemoService::esDemo($user->get_email()),
         ];
 
         $event->setData($data);

@@ -40,6 +40,11 @@ framework:
             policy: sliding_window
             limit: 120
             interval: '10 minutes'
+        # Ingresos a la tienda de ejemplo ("Probar sin registrarme"), por IP.
+        demo:
+            policy: sliding_window
+            limit: 20
+            interval: '10 minutes'
 
 when@test:
     framework:
@@ -52,3 +57,4 @@ when@test:
             catalogo_publico: { policy: sliding_window, limit: 10000, interval: '1 minute' }
             solicitud_publica: { policy: sliding_window, limit: 10000, interval: '1 hour' }
             fotos_subida: { policy: sliding_window, limit: 10000, interval: '10 minutes' }
+            demo: { policy: sliding_window, limit: 10000, interval: '10 minutes' }
