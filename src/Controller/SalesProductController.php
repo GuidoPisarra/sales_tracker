@@ -8,6 +8,8 @@ use App\DTO\SalesProduct\RegisterSalesProductDTO;
 use App\Form\Type\SalesProduct\AddSalesProductType;
 use App\Form\Type\SalesProduct\DeleteSalesProductType;
 use App\Form\Type\SalesProduct\RegisterSalesProductType;
+use App\Repository\SalesProductRepository;
+use App\Service\AuditoriaService;
 use App\Service\SalesProductService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -155,6 +157,37 @@ class SalesProductController extends BaseController
             return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
         }
         return $this->respuesta(400, [], ['Ocurrió un error desconocido.'], 400);
+    }
+
+    /**
+     * Anula una venta entera y devuelve el stock (solo administrador). Body: {"idSale": N}.
+     * Las ventas en cuenta corriente no se anulan acá (tienen deuda del cliente).
+     */
+    #[Route('/anular', name: 'app_salesProduct_anular', methods: ['POST'])]
+    public function anular(Request $request, SalesProductRepository $ventas, AuditoriaService $auditoria): JsonResponse
+    {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
+        $datos = json_decode($request->getContent(), true) ?: [];
+        $idSale = (int) ($datos['idSale'] ?? 0);
+        if ($idSale <= 0) {
+            return $this->respuesta(400, [], ['Falta la venta.'], 400);
+        }
+        try {
+            $r = $ventas->anularVenta($idSale, (int) $this->idNegocioUsuarioActual());
+        } catch (\Throwable $th) {
+            error_log('anular venta: ' . $th->getMessage());
+            return $this->respuesta(400, [], ['No se pudo anular la venta.'], 400);
+        }
+        if ($r === 'no_existe') {
+            return $this->respuesta(404, [], ['No se encontró la venta (o ya estaba anulada).'], 404);
+        }
+        if ($r === 'cta_cte') {
+            return $this->respuesta(409, [], ['Las ventas en cuenta corriente no se pueden anular desde acá.'], 409);
+        }
+        $auditoria->registrar('venta_anulada', ['id_sale' => $idSale]);
+        return $this->respuesta(200, ['anulada' => true], []);
     }
 
     /**
