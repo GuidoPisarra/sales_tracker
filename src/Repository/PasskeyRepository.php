@@ -64,7 +64,7 @@ class PasskeyRepository extends BaseRepository
 
     public function lista(int $idUsuario): array
     {
-        $stmt = $this->get_bbdd()->prepare('SELECT id, nombre, rp_id, creada, usada FROM usuario_passkey WHERE id_usuario = ? ORDER BY creada DESC');
+        $stmt = $this->get_bbdd()->prepare('SELECT id, nombre, rp_id, credencial, creada, usada FROM usuario_passkey WHERE id_usuario = ? ORDER BY creada DESC');
         $stmt->execute([$idUsuario]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

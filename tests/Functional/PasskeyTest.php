@@ -129,6 +129,7 @@ class PasskeyTest extends KontiaTestCase
 
         [$estado, $r] = $this->pedirDesde('GET', '/api/passkey', null, $this->tokenPara('titular@test.com'));
         $this->assertSame('iPhone', $r['datos'][0]['nombre']);
+        $this->assertSame(PasskeyService::aBase64Url($this->credencial), $r['datos'][0]['credencial']);
         $this->assertNotNull($r['datos'][0]['usada']);
     }
 
