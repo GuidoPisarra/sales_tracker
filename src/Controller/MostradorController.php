@@ -30,7 +30,7 @@ class MostradorController extends BaseController
         $idNegocio = (int) $this->idNegocioUsuarioActual();
         $d = json_decode($request->getContent(), true) ?: [];
         $campos = [];
-        foreach (['ticket_titulo' => 120, 'ticket_direccion' => 200, 'ticket_telefono' => 40, 'ticket_pie' => 300] as $c => $max) {
+        foreach (['ticket_titulo' => 120, 'ticket_direccion' => 200, 'ticket_telefono' => 40, 'ticket_pie' => 300, 'fiado_mensaje' => 500] as $c => $max) {
             if (array_key_exists($c, $d)) {
                 $v = trim((string) $d[$c]);
                 $campos[$c] = $v === '' ? null : mb_substr($v, 0, $max);
@@ -60,6 +60,7 @@ class MostradorController extends BaseController
             'ticket_pie' => $c['ticket_pie'] ?? null,
             'ticket_ancho' => (int) ($c['ticket_ancho'] ?? 58) === 80 ? 80 : 58,
             'stock_minimo_general' => (int) ($c['stock_minimo_general'] ?? 3),
+            'fiado_mensaje' => ($c['fiado_mensaje'] ?? null) ?: FiadoController::MENSAJE_PREDETERMINADO,
         ];
     }
 }

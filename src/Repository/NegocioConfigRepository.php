@@ -30,6 +30,7 @@ class NegocioConfigRepository extends BaseRepository
             'ticket_telefono' => null,
             'ticket_pie' => null,
             'ticket_ancho' => 58,
+            'fiado_mensaje' => null,
         ];
     }
 

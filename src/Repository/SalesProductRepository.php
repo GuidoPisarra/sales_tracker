@@ -69,8 +69,9 @@ class SalesProductRepository extends BaseRepository
             // Se preparan una sola vez y se reusan por cada producto del carrito.
             $querySale = $pdo->prepare('INSERT INTO sales (id_product, id_negocio) VALUES (:idProduct, :idNegocio)');
             $query = $pdo->prepare('INSERT INTO sales_product
-                    (id_sale, id_product, quantity, price, sale_product_date, type_payment, active, register,id_negocio,sucursal, id_persona,usuario)
-                    VALUES (:idSale, :idProduct, :quantity, :price, :saleDay, :typePayment, :active, :register, :id_negocio, :sucursal, :id_persona,:usuario)');
+                    (id_sale, id_product, quantity, price, sale_product_date, type_payment, active, register,id_negocio,sucursal, id_persona,usuario, cost)
+                    VALUES (:idSale, :idProduct, :quantity, :price, :saleDay, :typePayment, :active, :register, :id_negocio, :sucursal, :id_persona,:usuario,
+                        (SELECT pc.cost_price FROM product pc WHERE pc.id = :idProductCosto))');
             $queryStock = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id AND p.id_negocio = :id_negocio AND p.quantity >= :quantityMinima');
             $queryStockActual = $pdo->prepare('SELECT quantity, description FROM product WHERE id = :id AND id_negocio = :id_negocio FOR UPDATE');
             $queryStockHastaCero = $pdo->prepare('UPDATE product SET quantity = GREATEST(quantity - :quantity, 0) WHERE id = :id AND id_negocio = :id_negocio');
@@ -102,6 +103,8 @@ class SalesProductRepository extends BaseRepository
                 $query->bindParam(':sucursal', $newSale["sucursal"]);
                 $query->bindParam(':id_persona', $newSale["id_persona"]);
                 $query->bindParam(':usuario', $newSale["usuario"]);
+                // Costo del momento, para el reporte de margen.
+                $query->bindParam(':idProductCosto', $newSale["idProduct"]);
 
                 if (!$query->execute()) {
                     throw new \Exception('No se pudo registrar el detalle de la venta.');

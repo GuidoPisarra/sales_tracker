@@ -163,4 +163,82 @@ class ReportRepository extends BaseRepository
         }
         return $meses;
     }
+
+    /**
+     * Margen de ganancia entre $desde y $hasta (Y-m-d H:i:s, hasta excluido). El costo es el
+     * guardado al vender; las ventas de antes de guardarlo usan el costo actual del producto.
+     * Las líneas sin costo cargado (0) no cuentan para el margen y se informan aparte.
+     */
+    public function margen(int $idNegocio, string $desde, string $hasta): array
+    {
+        $costo = 'COALESCE(sp.cost, p.cost_price, 0)';
+        $base = "FROM sales_product sp JOIN product p ON p.id = sp.id_product
+            WHERE sp.active = 0 AND sp.id_negocio = :n AND sp.sale_product_date >= :desde AND sp.sale_product_date < :hasta";
+        $params = [':n' => $idNegocio, ':desde' => $desde, ':hasta' => $hasta];
+        $conCosto = "$costo > 0";
+
+        $stmt = $this->get_bbdd()->prepare("SELECT
+                COALESCE(SUM(sp.quantity * sp.price), 0) AS ventas,
+                COALESCE(SUM(CASE WHEN $conCosto THEN sp.quantity * sp.price ELSE 0 END), 0) AS ventas_con_costo,
+                COALESCE(SUM(CASE WHEN $conCosto THEN sp.quantity * $costo ELSE 0 END), 0) AS costo,
+                COALESCE(SUM(CASE WHEN $conCosto THEN 0 ELSE sp.quantity * sp.price END), 0) AS ventas_sin_costo,
+                COUNT(DISTINCT CASE WHEN $conCosto THEN NULL ELSE sp.id_product END) AS productos_sin_costo,
+                COALESCE(SUM(sp.quantity), 0) AS unidades,
+                COUNT(DISTINCT sp.id_sale) AS cantidad_ventas
+            $base");
+        $stmt->execute($params);
+        $t = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $totales = self::numeros([
+            'ventas' => $t['ventas'] ?? 0,
+            'costo' => $t['costo'] ?? 0,
+            'ganancia' => (float) ($t['ventas_con_costo'] ?? 0) - (float) ($t['costo'] ?? 0),
+            'ventas_con_costo' => $t['ventas_con_costo'] ?? 0,
+            'ventas_sin_costo' => $t['ventas_sin_costo'] ?? 0,
+        ]);
+        $totales['margen'] = self::porcentaje($totales['ganancia'], $totales['ventas_con_costo']);
+        $totales['productos_sin_costo'] = (int) ($t['productos_sin_costo'] ?? 0);
+        $totales['unidades'] = (int) ($t['unidades'] ?? 0);
+        $totales['cantidad_ventas'] = (int) ($t['cantidad_ventas'] ?? 0);
+
+        $stmt = $this->get_bbdd()->prepare("SELECT sp.id_product AS id, MAX(p.description) AS descripcion,
+                SUM(sp.quantity) AS unidades, SUM(sp.quantity * sp.price) AS ventas,
+                SUM(sp.quantity * $costo) AS costo, MIN($costo) > 0 AS con_costo
+            $base GROUP BY sp.id_product ORDER BY SUM(sp.quantity * sp.price) DESC LIMIT 500");
+        $stmt->execute($params);
+        $productos = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $f) {
+            $conCostoProducto = (int) $f['con_costo'] === 1;
+            $ventas = round((float) $f['ventas'], 2);
+            $costoProducto = round((float) $f['costo'], 2);
+            $productos[] = [
+                'id' => (int) $f['id'],
+                'descripcion' => $f['descripcion'],
+                'unidades' => (int) $f['unidades'],
+                'ventas' => $ventas,
+                'costo' => $conCostoProducto ? $costoProducto : null,
+                'ganancia' => $conCostoProducto ? round($ventas - $costoProducto, 2) : null,
+                'margen' => $conCostoProducto ? self::porcentaje($ventas - $costoProducto, $ventas) : null,
+            ];
+        }
+
+        $stmt = $this->get_bbdd()->prepare("SELECT DATE(sp.sale_product_date) AS fecha,
+                SUM(sp.quantity * sp.price) AS ventas,
+                SUM(CASE WHEN $conCosto THEN sp.quantity * (sp.price - $costo) ELSE 0 END) AS ganancia
+            $base GROUP BY DATE(sp.sale_product_date) ORDER BY fecha");
+        $stmt->execute($params);
+        $dias = array_map(fn ($f) => ['fecha' => $f['fecha'], 'ventas' => round((float) $f['ventas'], 2), 'ganancia' => round((float) $f['ganancia'], 2)],
+            $stmt->fetchAll(PDO::FETCH_ASSOC) ?: []);
+
+        return ['totales' => $totales, 'productos' => $productos, 'dias' => $dias];
+    }
+
+    private static function numeros(array $valores): array
+    {
+        return array_map(fn ($v) => round((float) $v, 2), $valores);
+    }
+
+    private static function porcentaje(float $parte, float $total): ?float
+    {
+        return $total > 0 ? round($parte * 100 / $total, 1) : null;
+    }
 }

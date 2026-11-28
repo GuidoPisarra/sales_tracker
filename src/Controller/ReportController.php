@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Repository\ProductsRepository;
+use App\Repository\ReportRepository;
 use App\Service\PreciosService;
 use App\Service\ReportService;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -135,6 +136,30 @@ class ReportController extends BaseController
         } catch (\Throwable $th) {
             error_log('resumen: ' . $th->getMessage());
             return $this->respuesta(400, [], ['No se pudo obtener el resumen.'], 400);
+        }
+    }
+
+    /**
+     * Margen de ganancia: ?desde=YYYY-MM-DD&hasta=YYYY-MM-DD (sin fechas, el mes en curso).
+     * Solo el administrador (muestra costos).
+     */
+    #[Route('/margen', name: 'app_report_margen', methods: ['GET'])]
+    public function margen(Request $request, ReportRepository $reportes): JsonResponse
+    {
+        if ($check = $this->soloTitular()) {
+            return $check;
+        }
+        [$desde, $hasta] = self::rangoFechas($request);
+        if ($desde === null) {
+            $hoy = new \DateTimeImmutable('today', new \DateTimeZone('America/Argentina/Buenos_Aires'));
+            $desde = $hoy->modify('first day of this month')->format('Y-m-d 00:00:00');
+            $hasta = $hoy->modify('+1 day')->format('Y-m-d 00:00:00');
+        }
+        try {
+            return $this->respuesta(200, $reportes->margen((int) $this->idNegocioUsuarioActual(), $desde, $hasta), []);
+        } catch (\Throwable $th) {
+            error_log('margen: ' . $th->getMessage());
+            return $this->respuesta(400, [], ['No se pudo calcular el margen.'], 400);
         }
     }
 }
