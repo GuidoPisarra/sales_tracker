@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Repository\CarritoClienteRepository;
 use App\Repository\NegocioConfigRepository;
 use App\Service\Fotos\FotosService;
 
@@ -14,7 +15,10 @@ use App\Service\Fotos\FotosService;
  */
 class ConsultaPrecioService
 {
-    public function __construct(private NegocioConfigRepository $repo, private CatalogoService $catalogo, private FotosService $fotos)
+    /** Lo que lleva el QR que muestra la clienta en la caja (seguido del token). */
+    public const PREFIJO_QR = 'KONTIA-CARRITO-';
+
+    public function __construct(private NegocioConfigRepository $repo, private CatalogoService $catalogo, private FotosService $fotos, private CarritoClienteRepository $carritos)
     {
     }
 
@@ -115,6 +119,7 @@ class ConsultaPrecioService
             $fotos = [];
         }
         return [
+            'id' => (int) $p['id'],
             'nombre' => $p['description'],
             'codigo' => $p['code'],
             'talle' => $p['size'],
@@ -122,10 +127,109 @@ class ConsultaPrecioService
             'disponible' => (int) $p['quantity'] > 0,
             'fotos' => $fotos,
             'opciones' => array_map(fn ($o) => [
+                'id' => (int) $o['id'],
                 'talle' => $o['size'],
                 'precio' => (float) $o['sale_price'],
                 'disponible' => (int) $o['quantity'] > 0,
             ], $otros),
+        ];
+    }
+
+    /**
+     * Guarda el carrito de la clienta y devuelve el código corto y el del QR.
+     * null si el link no existe; string con el error si el carrito no sirve.
+     * @param array $items [{id, cantidad}]
+     * @return array|string|null
+     */
+    public function crearCarrito(string $slug, array $items)
+    {
+        $n = $this->negocio($slug);
+        if (!$n) {
+            return null;
+        }
+        [$idNegocio, , $sucursal] = $n;
+        $cantidades = [];
+        foreach ($items as $i) {
+            $id = (int) ($i['id'] ?? 0);
+            $cantidad = (int) ($i['cantidad'] ?? 0);
+            if ($id <= 0 || $cantidad < 1 || $cantidad > 99) {
+                return 'Revisá las cantidades del carrito.';
+            }
+            $cantidades[$id] = min(99, ($cantidades[$id] ?? 0) + $cantidad);
+        }
+        if (!$cantidades) {
+            return 'El carrito está vacío.';
+        }
+        if (count($cantidades) > 50) {
+            return 'El carrito tiene demasiados productos.';
+        }
+        $productos = $this->carritos->productos($idNegocio, $sucursal, array_keys($cantidades));
+        if (count($productos) !== count($cantidades)) {
+            return 'Algún producto del carrito ya no está disponible. Volvé a escanearlo.';
+        }
+        $codigo = null;
+        for ($i = 0; $i < 30; $i++) {
+            $candidato = str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
+            if (!$this->carritos->codigoEnUso($idNegocio, $candidato)) {
+                $codigo = $candidato;
+                break;
+            }
+        }
+        if ($codigo === null) {
+            return 'Hay demasiados carritos abiertos. Probá de nuevo en un rato.';
+        }
+        $token = bin2hex(random_bytes(12));
+        $lista = [];
+        foreach ($cantidades as $id => $cantidad) {
+            $lista[] = ['id' => $id, 'cantidad' => $cantidad];
+        }
+        $this->carritos->crear($idNegocio, $sucursal, $codigo, $token, $lista);
+        $total = 0.0;
+        foreach ($cantidades as $id => $cantidad) {
+            $total += (float) $productos[$id]['sale_price'] * $cantidad;
+        }
+        return [
+            'codigo' => $codigo,
+            'qr' => self::PREFIJO_QR . $token,
+            'total' => round($total, 2),
+            'vence_horas' => CarritoClienteRepository::HORAS,
+        ];
+    }
+
+    /**
+     * Carrito para cargar en Caja, por el código de 4 números o el texto del QR.
+     * Devuelve los productos con el precio de ahora (en Caja se recalcula igual).
+     */
+    public function carritoParaCaja(int $idNegocio, string $valor): ?array
+    {
+        $valor = trim($valor);
+        if (str_starts_with(strtoupper($valor), self::PREFIJO_QR)) {
+            $c = $this->carritos->vigente($idNegocio, null, strtolower(substr($valor, strlen(self::PREFIJO_QR))));
+        } elseif (preg_match('/^\d{4}$/', $valor)) {
+            $c = $this->carritos->vigente($idNegocio, $valor, null);
+        } else {
+            return null;
+        }
+        if (!$c) {
+            return null;
+        }
+        $items = json_decode((string) $c['items'], true) ?: [];
+        $productos = $this->carritos->productos($idNegocio, (int) $c['sucursal'], array_column($items, 'id'));
+        $this->carritos->marcarTomado((int) $c['id']);
+        return [
+            'codigo' => $c['codigo'],
+            'sucursal' => (int) $c['sucursal'],
+            'creado_en' => $c['creado_en'],
+            'ya_cargado' => $c['tomado_en'] !== null,
+            'items' => array_values(array_map(fn ($i) => [
+                'id' => (int) $i['id'],
+                'cantidad' => (int) $i['cantidad'],
+                'codigo' => $productos[(int) $i['id']]['code'] ?? null,
+                'nombre' => $productos[(int) $i['id']]['description'] ?? null,
+                'talle' => $productos[(int) $i['id']]['size'] ?? null,
+                'precio' => isset($productos[(int) $i['id']]) ? (float) $productos[(int) $i['id']]['sale_price'] : null,
+                'disponible' => isset($productos[(int) $i['id']]),
+            ], $items)),
         ];
     }
 

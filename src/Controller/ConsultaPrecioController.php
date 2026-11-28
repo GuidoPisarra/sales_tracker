@@ -66,6 +66,34 @@ class ConsultaPrecioController extends BaseController
         return $this->respuesta(200, $p, [], 200, ['Cache-Control' => 'no-store']);
     }
 
+    #[Route('/api/publico/precio/{slug}/carrito', name: 'app_consulta_precio_carrito', methods: ['POST'], priority: 10)]
+    public function carrito(string $slug, Request $request, ConsultaPrecioService $precios, RateLimiterFactory $carritoClienteLimiter): JsonResponse
+    {
+        if ($r = $this->limite($request, $carritoClienteLimiter)) {
+            return $r;
+        }
+        $d = json_decode($request->getContent(), true) ?: [];
+        $r = $precios->crearCarrito($slug, is_array($d['items'] ?? null) ? $d['items'] : []);
+        if ($r === null) {
+            return $this->respuesta(404, [], ['Esta consulta de precios no existe o no está disponible.'], 404);
+        }
+        if (is_string($r)) {
+            return $this->respuesta(409, [], [$r], 409);
+        }
+        return $this->respuesta(200, $r, []);
+    }
+
+    /** Caja (cualquier usuario del negocio) trae el carrito por código o QR. */
+    #[Route('/api/carrito-cliente/{valor}', name: 'app_carrito_cliente', methods: ['GET'])]
+    public function carritoCaja(string $valor, ConsultaPrecioService $precios): JsonResponse
+    {
+        $c = $precios->carritoParaCaja((int) $this->idNegocioUsuarioActual(), $valor);
+        if (!$c) {
+            return $this->respuesta(404, [], ['No hay ningún carrito con ese código. Los carritos duran ' . \App\Repository\CarritoClienteRepository::HORAS . ' horas.'], 404);
+        }
+        return $this->respuesta(200, $c, []);
+    }
+
     private function limite(Request $request, RateLimiterFactory $limiter): ?JsonResponse
     {
         if (!$limiter->create($request->getClientIp() ?? 'sin-ip')->consume()->isAccepted()) {

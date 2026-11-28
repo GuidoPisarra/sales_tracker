@@ -101,4 +101,51 @@ class ConsultaPrecioTest extends KontiaTestCase
         $this->assertSame(409, $estado);
         $this->assertStringContainsString('otro negocio', $r['errores'][0]);
     }
+
+    public function testCarritoDeLaClientaSeCargaEnCaja(): void
+    {
+        $this->pedir('POST', '/api/consulta-precio/config', ['activo' => true, 'slug' => 'casa-lola'], $this->token);
+        [, $r] = $this->pedir('GET', '/api/publico/precio/casa-lola/K1');
+        $s = $r['datos']['id'];
+        $m = $r['datos']['opciones'][0]['id'];
+
+        // Vacío, cantidades raras, borrado o de otro negocio: no se guarda.
+        $borrado = (int) $this->pdo()->query("SELECT id FROM product WHERE code = 'K3'")->fetchColumn();
+        $ajeno = (int) $this->pdo()->query("SELECT id FROM product WHERE code = 'K4'")->fetchColumn();
+        foreach ([[], [['id' => $s, 'cantidad' => 0]], [['id' => $borrado, 'cantidad' => 1]], [['id' => $ajeno, 'cantidad' => 1]]] as $items) {
+            [$estado] = $this->pedir('POST', '/api/publico/precio/casa-lola/carrito', ['items' => $items]);
+            $this->assertSame(409, $estado, json_encode($items));
+        }
+
+        [$estado, $r] = $this->pedir('POST', '/api/publico/precio/casa-lola/carrito', ['items' => [
+            ['id' => $s, 'cantidad' => 2], ['id' => $m, 'cantidad' => 1], ['id' => $s, 'cantidad' => 1],
+        ]]);
+        $this->assertSame(200, $estado, json_encode($r));
+        $codigo = $r['datos']['codigo'];
+        $this->assertMatchesRegularExpression('/^\d{4}$/', $codigo);
+        $this->assertStringStartsWith('KONTIA-CARRITO-', $r['datos']['qr']);
+        $this->assertEquals(400, $r['datos']['total']);
+
+        // Sin sesión o desde otro negocio no se ve.
+        [$estado] = $this->pedir('GET', "/api/carrito-cliente/$codigo");
+        $this->assertSame(401, $estado);
+        [$estado] = $this->pedir('GET', "/api/carrito-cliente/$codigo", null, $this->tokenOtro);
+        $this->assertSame(404, $estado);
+
+        // El empleado lo carga en Caja por el código o por el QR.
+        [$estado, $r2] = $this->pedir('GET', "/api/carrito-cliente/$codigo", null, $this->tokenEmpleado);
+        $this->assertSame(200, $estado, json_encode($r2));
+        $this->assertFalse($r2['datos']['ya_cargado']);
+        $this->assertCount(2, $r2['datos']['items']);
+        $this->assertSame(['id' => $s, 'cantidad' => 3], array_intersect_key($r2['datos']['items'][0], ['id' => 0, 'cantidad' => 0]));
+        $this->assertSame('K1', $r2['datos']['items'][0]['codigo']);
+        [$estado, $r3] = $this->pedir('GET', '/api/carrito-cliente/' . $r['datos']['qr'], null, $this->token);
+        $this->assertSame(200, $estado);
+        $this->assertTrue($r3['datos']['ya_cargado']);
+
+        // Vencido: ya no aparece.
+        $this->pdo()->exec('UPDATE carrito_cliente SET creado_en = DATE_SUB(NOW(), INTERVAL 7 HOUR)');
+        [$estado] = $this->pedir('GET', "/api/carrito-cliente/$codigo", null, $this->token);
+        $this->assertSame(404, $estado);
+    }
 }
