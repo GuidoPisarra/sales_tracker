@@ -30,6 +30,16 @@ framework:
             policy: sliding_window
             limit: 120
             interval: '1 minute'
+        # "Consultá el precio" en el local (escaneos de etiquetas), por IP.
+        consulta_precio:
+            policy: sliding_window
+            limit: 240
+            interval: '1 minute'
+        # Carritos que arma la clienta en el local, por IP.
+        carrito_cliente:
+            policy: sliding_window
+            limit: 20
+            interval: '10 minutes'
         # Pedidos de arrepentimiento / baja desde la web pública, por IP.
         solicitud_publica:
             policy: sliding_window
@@ -50,5 +60,7 @@ when@test:
             escaneo_vincular: { policy: sliding_window, limit: 10000, interval: '15 minutes' }
             escaneo_codigo: { policy: sliding_window, limit: 10000, interval: '1 minute' }
             catalogo_publico: { policy: sliding_window, limit: 10000, interval: '1 minute' }
+            consulta_precio: { policy: sliding_window, limit: 10000, interval: '1 minute' }
+            carrito_cliente: { policy: sliding_window, limit: 10000, interval: '10 minutes' }
             solicitud_publica: { policy: sliding_window, limit: 10000, interval: '1 hour' }
             fotos_subida: { policy: sliding_window, limit: 10000, interval: '10 minutes' }

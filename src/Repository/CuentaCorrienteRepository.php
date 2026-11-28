@@ -352,4 +352,43 @@ class CuentaCorrienteRepository extends BaseRepository
 
         return $deuda - $pagos;
     }
+
+    /**
+     * Clientes que deben, con lo necesario para recordarles por WhatsApp: saldo, teléfono,
+     * fecha de la primera y la última compra fiada, último pago y último recordatorio.
+     */
+    public function deudores(int $idNegocio): array
+    {
+        $stmt = $this->get_bbdd()->prepare('SELECT * FROM (
+                SELECT c.id, c.nombre, c.apellido, c.telefono, c.dni, c.recordado_en,
+                    COALESCE(d.total, 0) - COALESCE(pg.total, 0) AS saldo,
+                    d.primera, d.ultima, pg.ultimo_pago
+                FROM clientes c
+                LEFT JOIN (
+                    SELECT id_persona, SUM(precio_original) AS total, MIN(fecha_venta) AS primera, MAX(fecha_venta) AS ultima
+                    FROM ctacte WHERE anulado = 0 AND id_negocio = :n1 GROUP BY id_persona
+                ) d ON d.id_persona = c.id
+                LEFT JOIN (
+                    SELECT ctacte.id_persona, SUM(pagos.entrega) AS total, MAX(pagos.fecha) AS ultimo_pago
+                    FROM pagos INNER JOIN ctacte ON ctacte.id = pagos.id_ctacte
+                    WHERE pagos.anulado = 0 AND ctacte.id_negocio = :n2 GROUP BY ctacte.id_persona
+                ) pg ON pg.id_persona = c.id
+                WHERE c.id_negocio = :n3
+            ) x WHERE saldo > 0.009 ORDER BY saldo DESC');
+        $stmt->execute([':n1' => $idNegocio, ':n2' => $idNegocio, ':n3' => $idNegocio]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /** Anota que se le mandó el recordatorio. false si el cliente no es del negocio. */
+    public function marcarRecordado(int $idNegocio, int $idCliente, string $cuando): bool
+    {
+        $stmt = $this->get_bbdd()->prepare('UPDATE clientes SET recordado_en = :f WHERE id = :id AND id_negocio = :n');
+        $stmt->execute([':f' => $cuando, ':id' => $idCliente, ':n' => $idNegocio]);
+        if ($stmt->rowCount() > 0) {
+            return true;
+        }
+        $existe = $this->get_bbdd()->prepare('SELECT 1 FROM clientes WHERE id = :id AND id_negocio = :n');
+        $existe->execute([':id' => $idCliente, ':n' => $idNegocio]);
+        return (bool) $existe->fetchColumn();
+    }
 }

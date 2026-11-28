@@ -5,7 +5,9 @@ namespace App\Service;
 use App\DTO\Reportes\ReportIncomesExpensesDTO;
 use App\Model\Venta;
 use App\Repository\ChangeProductRepository;
+use App\Repository\FacturaRepository;
 use App\Repository\ReportRepository;
+use App\Repository\SalesProductRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 
 class ReportService
@@ -15,8 +17,12 @@ class ReportService
     protected $rep_report;
     protected $rep_change;
 
-    public function __construct(ReportRepository $rep_report, ChangeProductRepository $rep_change)
-    {
+    public function __construct(
+        ReportRepository $rep_report,
+        ChangeProductRepository $rep_change,
+        private ?SalesProductRepository $rep_sales = null,
+        private ?FacturaRepository $rep_facturas = null
+    ) {
         $this->rep_report = $rep_report;
         $this->rep_change = $rep_change;
     }
@@ -66,6 +72,34 @@ class ReportService
                 "type_payment" => $venta['type_payment']
             ];
         }
+
+        // Detalle del pago mixto y estado de la factura de cada venta (en cada línea,
+        // porque el front muestra la venta a partir de su primera línea).
+        $idsVenta = array_map(fn ($lineas) => (int) $lineas[0]['id_sale'], $ventasAgrupadas);
+        $pagos = $this->rep_sales ? $this->rep_sales->pagosDeVentas($id_negocio, $idsVenta) : [];
+        $facturas = [];
+        if ($this->rep_facturas) {
+            try {
+                $facturas = $this->rep_facturas->ultimasDeVentas($id_negocio, $idsVenta);
+            } catch (\PDOException $e) {
+                $facturas = []; // Base sin la migración 0014.
+            }
+        }
+        foreach ($ventasAgrupadas as &$lineas) {
+            $idSale = (int) $lineas[0]['id_sale'];
+            foreach ($lineas as &$linea) {
+                $linea['pagos'] = $pagos[$idSale] ?? null;
+                $linea['factura'] = isset($facturas[$idSale]) ? [
+                    'id' => (int) $facturas[$idSale]['id'],
+                    'estado' => $facturas[$idSale]['estado'],
+                    'tipo_cbte' => (int) $facturas[$idSale]['tipo_cbte'],
+                    'numero' => $facturas[$idSale]['numero'] !== null ? sprintf('%05d-%08d', (int) $facturas[$idSale]['punto_venta'], (int) $facturas[$idSale]['numero']) : null,
+                    'error' => $facturas[$idSale]['error'],
+                ] : null;
+            }
+            unset($linea);
+        }
+        unset($lineas);
 
         // Convierte el arreglo de ventas agrupadas en un formato de lista
         $ventasAgrupadas = array_values($ventasAgrupadas);

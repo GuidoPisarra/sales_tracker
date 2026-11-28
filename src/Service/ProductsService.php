@@ -96,6 +96,16 @@ class ProductsService
         return $this->rep_products->actualizarPrecios($idNegocio, array_slice($precios, 0, 1000, true), $this->get_fecha_hora_actual());
     }
 
+    public function paraReponer(int $idNegocio, ?int $sucursal): array
+    {
+        return $this->rep_products->paraReponer($idNegocio, $sucursal);
+    }
+
+    public function fijarStockMinimo(int $idNegocio, int $id, ?int $minimo): bool
+    {
+        return $this->rep_products->fijarStockMinimo($idNegocio, $id, $minimo);
+    }
+
     public function editarMasivo(int $idNegocio, array $ids, array $cambios): int
     {
         return $this->rep_products->editarMasivo($idNegocio, array_slice($ids, 0, 5000), $cambios, $this->get_fecha_hora_actual());

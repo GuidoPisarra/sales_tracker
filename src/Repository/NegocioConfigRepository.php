@@ -24,6 +24,15 @@ class NegocioConfigRepository extends BaseRepository
             'catalogo_sucursal' => 1,
             'catalogo_mostrar_stock' => 0,
             'catalogo_sin_stock' => 0,
+            'stock_minimo_general' => 3,
+            'ticket_titulo' => null,
+            'ticket_direccion' => null,
+            'ticket_telefono' => null,
+            'ticket_pie' => null,
+            'ticket_ancho' => 58,
+            'fiado_mensaje' => null,
+            'precios_activo' => 0,
+            'precios_sucursal' => null,
         ];
     }
 
@@ -74,6 +83,29 @@ class NegocioConfigRepository extends BaseRepository
         }
         $stmt = $this->get_bbdd()->prepare($sql . ' ORDER BY description LIMIT 5000');
         $stmt->execute([':n' => $idNegocio, ':s' => $sucursal]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * Producto activo de la sucursal por el código que tiene la etiqueta: código de Kontia
+     * (el del QR), código de barras o código interno.
+     */
+    public function productoPorCodigo(int $idNegocio, int $sucursal, string $codigo): ?array
+    {
+        $stmt = $this->get_bbdd()->prepare('SELECT id, description, code, size, sale_price, quantity FROM product
+            WHERE id_negocio = :n AND sucursal = :s AND activo = 0 AND (code = :c1 OR barcode = :c2 OR codigo_interno = :c3)
+            ORDER BY code = :c4 DESC, id DESC LIMIT 1');
+        $stmt->execute([':n' => $idNegocio, ':s' => $sucursal, ':c1' => $codigo, ':c2' => $codigo, ':c3' => $codigo, ':c4' => $codigo]);
+        return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    /** Otros productos con el mismo nombre (otros talles o colores) en la sucursal. */
+    public function mismaDescripcion(int $idNegocio, int $sucursal, string $descripcion, int $sinId): array
+    {
+        $stmt = $this->get_bbdd()->prepare('SELECT id, size, sale_price, quantity FROM product
+            WHERE id_negocio = :n AND sucursal = :s AND activo = 0 AND description = :d AND id <> :id AND sale_price > 0
+            ORDER BY size LIMIT 30');
+        $stmt->execute([':n' => $idNegocio, ':s' => $sucursal, ':d' => $descripcion, ':id' => $sinId]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 }

@@ -35,9 +35,10 @@ class SalesProductRepository extends BaseRepository
      * Con stock forzado (o sin conexión) el stock baja hasta 0, nunca a negativo, y lo que
      * faltó se anota en stock_faltante (ver faltantes()). Las faltas quedan en $this->ultimosFaltantes.
      */
-    public function save_salesProduct(array $datosDto, ?string $clave = null, array $forzarStock = [], bool $sinConexion = false)
+    public function save_salesProduct(array $datosDto, ?string $clave = null, array $forzarStock = [], bool $sinConexion = false, array $pagos = [])
     {
         $this->ultimosFaltantes = [];
+        $this->ultimaVenta = null;
         $active = 0;
         $register = 0;
 
@@ -68,8 +69,9 @@ class SalesProductRepository extends BaseRepository
             // Se preparan una sola vez y se reusan por cada producto del carrito.
             $querySale = $pdo->prepare('INSERT INTO sales (id_product, id_negocio) VALUES (:idProduct, :idNegocio)');
             $query = $pdo->prepare('INSERT INTO sales_product
-                    (id_sale, id_product, quantity, price, sale_product_date, type_payment, active, register,id_negocio,sucursal, id_persona,usuario)
-                    VALUES (:idSale, :idProduct, :quantity, :price, :saleDay, :typePayment, :active, :register, :id_negocio, :sucursal, :id_persona,:usuario)');
+                    (id_sale, id_product, quantity, price, sale_product_date, type_payment, active, register,id_negocio,sucursal, id_persona,usuario, cost)
+                    VALUES (:idSale, :idProduct, :quantity, :price, :saleDay, :typePayment, :active, :register, :id_negocio, :sucursal, :id_persona,:usuario,
+                        (SELECT pc.cost_price FROM product pc WHERE pc.id = :idProductCosto))');
             $queryStock = $pdo->prepare('UPDATE product p SET p.quantity = p.quantity - :quantity WHERE p.id = :id AND p.id_negocio = :id_negocio AND p.quantity >= :quantityMinima');
             $queryStockActual = $pdo->prepare('SELECT quantity, description FROM product WHERE id = :id AND id_negocio = :id_negocio FOR UPDATE');
             $queryStockHastaCero = $pdo->prepare('UPDATE product SET quantity = GREATEST(quantity - :quantity, 0) WHERE id = :id AND id_negocio = :id_negocio');
@@ -101,6 +103,8 @@ class SalesProductRepository extends BaseRepository
                 $query->bindParam(':sucursal', $newSale["sucursal"]);
                 $query->bindParam(':id_persona', $newSale["id_persona"]);
                 $query->bindParam(':usuario', $newSale["usuario"]);
+                // Costo del momento, para el reporte de margen.
+                $query->bindParam(':idProductCosto', $newSale["idProduct"]);
 
                 if (!$query->execute()) {
                     throw new \Exception('No se pudo registrar el detalle de la venta.');
@@ -138,7 +142,16 @@ class SalesProductRepository extends BaseRepository
                 }
             }
 
+            // Pago mixto: cuánto se pagó con cada medio.
+            if ($pagos && $idSALE !== null) {
+                $queryPago = $pdo->prepare('INSERT INTO venta_pago (id_negocio, id_sale, forma, monto) VALUES (:n, :v, :f, :m)');
+                foreach ($pagos as $pago) {
+                    $queryPago->execute([':n' => $datosDto[0]->to_array()['id_negocio'], ':v' => $idSALE, ':f' => $pago['forma'], ':m' => $pago['monto']]);
+                }
+            }
+
             $pdo->commit();
+            $this->ultimaVenta = $idSALE;
             return true;
         } catch (\Throwable $th) {
             if ($pdo->inTransaction()) {
@@ -146,6 +159,26 @@ class SalesProductRepository extends BaseRepository
             }
             throw $th;
         }
+    }
+
+    /** Número (id_sale) de la última venta guardada. */
+    public ?int $ultimaVenta = null;
+
+    /** Detalle de pago de ventas mixtas: [id_sale => [{forma, monto}]]. */
+    public function pagosDeVentas(int $idNegocio, array $idsVenta): array
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $idsVenta), fn ($i) => $i > 0)));
+        if (!$ids) {
+            return [];
+        }
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->get_bbdd()->prepare("SELECT id_sale, forma, monto FROM venta_pago WHERE id_negocio = ? AND id_sale IN ($marcas) ORDER BY id");
+        $stmt->execute(array_merge([$idNegocio], $ids));
+        $resultado = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: [] as $f) {
+            $resultado[(int) $f['id_sale']][] = ['forma' => $f['forma'], 'monto' => (float) $f['monto']];
+        }
+        return $resultado;
     }
 
     /** Faltantes de stock de la última venta guardada: [{id_product, description, faltante}]. */
@@ -325,6 +358,8 @@ class SalesProductRepository extends BaseRepository
         if (!$query->execute()) {
             throw new \Exception('No se pudo actualizar la forma de pago.');
         }
+        // Si era un pago mixto, ahora es todo con un solo medio.
+        $pdo->prepare('DELETE FROM venta_pago WHERE id_sale = :v AND id_negocio = :n')->execute([':v' => $idSale, ':n' => $idNegocio]);
 
         return true;
     }

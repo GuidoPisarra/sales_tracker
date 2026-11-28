@@ -39,12 +39,15 @@ class AvisosService
     private $preciosService;
     private $rep_sales;
 
-    public function __construct(ProductsRepository $rep_products, PreciosService $preciosService, SalesProductRepository $rep_sales)
+    public function __construct(ProductsRepository $rep_products, PreciosService $preciosService, SalesProductRepository $rep_sales, ?\App\Repository\CuentaCorrienteRepository $rep_cuentas = null)
     {
+        $this->rep_cuentas = $rep_cuentas;
         $this->rep_products = $rep_products;
         $this->preciosService = $preciosService;
         $this->rep_sales = $rep_sales;
     }
+
+    private ?\App\Repository\CuentaCorrienteRepository $rep_cuentas;
 
     public function obtenerAvisos(int $idNegocio, bool $esTitular): array
     {
@@ -65,16 +68,43 @@ class AvisosService
             ];
         }
 
-        $sinStock = $this->rep_products->contarSinStock($idNegocio);
-        if ($sinStock > 0) {
+        // Productos en el stock mínimo o por debajo (incluye los que se quedaron sin stock).
+        $reponer = $this->rep_products->contarParaReponer($idNegocio);
+        if ($reponer > 0) {
+            $sinStock = $this->rep_products->contarSinStock($idNegocio);
+            $detalle = $sinStock > 0 ? ($sinStock === 1 ? ' 1 ya no tiene stock.' : " {$sinStock} ya no tienen stock.") : '';
             $avisos[] = [
-                'id' => $this->idAviso('sin_stock', $hoy, $sinStock),
-                'titulo' => 'Productos sin stock',
-                'mensaje' => $sinStock === 1
-                    ? 'Hay 1 producto sin stock.'
-                    : "Hay {$sinStock} productos sin stock.",
+                'id' => $this->idAviso('reponer', $hoy, $reponer),
+                'titulo' => 'Productos para reponer',
+                'mensaje' => ($reponer === 1
+                    ? 'Hay 1 producto en el stock mínimo o por debajo.'
+                    : "Hay {$reponer} productos en el stock mínimo o por debajo.") . $detalle,
                 'tipo' => 'advertencia',
+                'ruta' => '/reponer',
+                'texto_ruta' => 'Ver lista para reponer',
             ];
+        }
+
+        // Fiados: clientes que no pagan hace más de 30 días.
+        if ($this->rep_cuentas && $esTitular) {
+            $limite = (new \DateTimeImmutable('today', new \DateTimeZone('America/Argentina/Buenos_Aires')))->modify('-30 days')->format('Y-m-d');
+            $viejos = count(array_filter($this->rep_cuentas->deudores($idNegocio), function ($f) use ($limite) {
+                $referencia = $f['ultimo_pago'] ?: $f['primera'];
+                return $referencia && substr($referencia, 0, 10) < $limite
+                    && (!$f['recordado_en'] || substr($f['recordado_en'], 0, 10) < $limite);
+            }));
+            if ($viejos > 0) {
+                $avisos[] = [
+                    'id' => $this->idAviso('fiado', $hoy, $viejos),
+                    'titulo' => 'Fiados para cobrar',
+                    'mensaje' => $viejos === 1
+                        ? '1 cliente no paga hace más de 30 días.'
+                        : "{$viejos} clientes no pagan hace más de 30 días.",
+                    'tipo' => 'advertencia',
+                    'ruta' => '/fiados',
+                    'texto_ruta' => 'Recordar por WhatsApp',
+                ];
+            }
         }
 
         // Ventas confirmadas sin stock (o hechas sin conexión) que dejaron el stock en 0.
