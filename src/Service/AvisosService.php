@@ -86,7 +86,7 @@ class AvisosService
         }
 
         // Fiados: clientes que no pagan hace más de 30 días.
-        if ($this->rep_cuentas) {
+        if ($this->rep_cuentas && $esTitular) {
             $limite = (new \DateTimeImmutable('today', new \DateTimeZone('America/Argentina/Buenos_Aires')))->modify('-30 days')->format('Y-m-d');
             $viejos = count(array_filter($this->rep_cuentas->deudores($idNegocio), function ($f) use ($limite) {
                 $referencia = $f['ultimo_pago'] ?: $f['primera'];

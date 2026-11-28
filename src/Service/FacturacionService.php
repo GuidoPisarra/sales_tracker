@@ -600,6 +600,8 @@ class FacturacionService
             'doc_tipo' => (int) $e['doc_tipo'],
             'doc_nro' => $e['doc_nro'],
             'receptor_nombre' => $e['receptor_nombre'],
+            // Códigos de ARCA: 1 RI, 4 exento, 5 consumidor final, 6 monotributo.
+            'receptor_condicion_iva' => isset($e['receptor_condicion_iva']) ? (int) $e['receptor_condicion_iva'] : null,
             'entorno' => $e['entorno'],
             'qr_url' => null,
         ];
