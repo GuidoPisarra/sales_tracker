@@ -123,7 +123,7 @@ class ConsultaPrecioTest extends KontiaTestCase
         $this->assertSame(200, $estado, json_encode($r));
         $codigo = $r['datos']['codigo'];
         $this->assertMatchesRegularExpression('/^\d{4}$/', $codigo);
-        $this->assertStringStartsWith('KONTIA-CARRITO-', $r['datos']['qr']);
+        $this->assertStringStartsWith('KONTIACARRITO', $r['datos']['qr']);
         $this->assertEquals(400, $r['datos']['total']);
 
         // Sin sesión o desde otro negocio no se ve.
@@ -139,7 +139,8 @@ class ConsultaPrecioTest extends KontiaTestCase
         $this->assertCount(2, $r2['datos']['items']);
         $this->assertSame(['id' => $s, 'cantidad' => 3], array_intersect_key($r2['datos']['items'][0], ['id' => 0, 'cantidad' => 0]));
         $this->assertSame('K1', $r2['datos']['items'][0]['codigo']);
-        [$estado, $r3] = $this->pedir('GET', '/api/carrito-cliente/' . $r['datos']['qr'], null, $this->token);
+        // Como lo tipea un lector USB con otra distribución de teclado (mayúsculas).
+        [$estado, $r3] = $this->pedir('GET', '/api/carrito-cliente/' . strtoupper($r['datos']['qr']), null, $this->token);
         $this->assertSame(200, $estado);
         $this->assertTrue($r3['datos']['ya_cargado']);
 

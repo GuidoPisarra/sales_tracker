@@ -15,8 +15,12 @@ use App\Service\Fotos\FotosService;
  */
 class ConsultaPrecioService
 {
-    /** Lo que lleva el QR que muestra la clienta en la caja (seguido del token). */
-    public const PREFIJO_QR = 'KONTIA-CARRITO-';
+    /**
+     * Lo que lleva el QR que muestra la clienta en la caja (seguido del token).
+     * Solo letras y números: los lectores USB que "tipean" con otra distribución
+     * de teclado cambian los guiones y otros signos.
+     */
+    public const PREFIJO_QR = 'KONTIACARRITO';
 
     public function __construct(private NegocioConfigRepository $repo, private CatalogoService $catalogo, private FotosService $fotos, private CarritoClienteRepository $carritos)
     {
@@ -202,7 +206,7 @@ class ConsultaPrecioService
      */
     public function carritoParaCaja(int $idNegocio, string $valor): ?array
     {
-        $valor = trim($valor);
+        $valor = (string) preg_replace('/[^A-Za-z0-9]/', '', $valor);
         if (str_starts_with(strtoupper($valor), self::PREFIJO_QR)) {
             $c = $this->carritos->vigente($idNegocio, null, strtolower(substr($valor, strlen(self::PREFIJO_QR))));
         } elseif (preg_match('/^\d{4}$/', $valor)) {
