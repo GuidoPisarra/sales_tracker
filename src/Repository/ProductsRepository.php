@@ -42,9 +42,58 @@ class ProductsRepository extends BaseRepository
 
     public function contarStockBajo(int $id_negocio): int
     {
-        $query = $this->get_bbdd()->prepare('SELECT COUNT(*) FROM product WHERE id_negocio = :id_negocio AND activo = 0 AND quantity > 0 AND quantity <= ' . self::STOCK_BAJO);
+        $query = $this->get_bbdd()->prepare('SELECT COUNT(*) FROM product p WHERE p.id_negocio = :id_negocio AND p.activo = 0 AND p.quantity > 0 AND p.quantity <= ' . self::MINIMO);
         $query->execute([':id_negocio' => $id_negocio]);
         return (int) $query->fetchColumn();
+    }
+
+    /** Productos con stock en el mínimo o por debajo (incluye los que están en 0). */
+    public function contarParaReponer(int $id_negocio): int
+    {
+        $query = $this->get_bbdd()->prepare('SELECT COUNT(*) FROM product p WHERE p.id_negocio = :id_negocio AND p.activo = 0 AND p.quantity <= ' . self::MINIMO);
+        $query->execute([':id_negocio' => $id_negocio]);
+        return (int) $query->fetchColumn();
+    }
+
+    /**
+     * Lista para reponer: productos con stock en el mínimo o por debajo, con su proveedor,
+     * ordenados por proveedor. "sugerido" es cuánto pedir para quedar en el doble del mínimo.
+     */
+    public function paraReponer(int $idNegocio, ?int $sucursal): array
+    {
+        $sql = 'SELECT p.id, p.description, p.code, p.barcode, p.size, p.quantity, p.cost_price AS costPrice,
+                    p.sucursal, n.nombre AS nombreSucursal, p.id_proveedor AS idProveedor, pr.nombre AS proveedor,
+                    pr.telefono AS telefonoProveedor, p.stock_minimo AS stockMinimo, ' . self::MINIMO . ' AS minimo
+                FROM product p
+                INNER JOIN negocio n ON n.id_negocio = p.id_negocio AND n.sucursal = p.sucursal
+                LEFT JOIN proveedores pr ON pr.id = p.id_proveedor AND pr.id_negocio = p.id_negocio
+                WHERE p.id_negocio = :n AND p.activo = 0 AND p.quantity <= ' . self::MINIMO;
+        $params = [':n' => $idNegocio];
+        if ($sucursal !== null && $sucursal > 0) {
+            $sql .= ' AND p.sucursal = :s';
+            $params[':s'] = $sucursal;
+        }
+        $sql .= ' ORDER BY pr.nombre IS NULL, pr.nombre, p.description LIMIT 2000';
+        $query = $this->get_bbdd()->prepare($sql);
+        $query->execute($params);
+        return array_map(function (array $f) {
+            $minimo = (int) $f['minimo'];
+            $f['quantity'] = (int) $f['quantity'];
+            $f['minimo'] = $minimo;
+            $f['stockMinimo'] = $f['stockMinimo'] === null ? null : (int) $f['stockMinimo'];
+            $f['sugerido'] = max($minimo * 2 - max($f['quantity'], 0), 1);
+            return $f;
+        }, $query->fetchAll(PDO::FETCH_ASSOC) ?: []);
+    }
+
+    /** Fija el stock mínimo de un producto (null = usar el general del negocio). */
+    public function fijarStockMinimo(int $idNegocio, int $id, ?int $minimo): bool
+    {
+        $query = $this->get_bbdd()->prepare('UPDATE product SET stock_minimo = :m WHERE id = :id AND id_negocio = :n');
+        $query->bindValue(':m', $minimo, $minimo === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $query->bindValue(':id', $id, PDO::PARAM_INT);
+        $query->bindValue(':n', $idNegocio, PDO::PARAM_INT);
+        return $query->execute();
     }
 
     public function contarActivos(int $id_negocio): int
@@ -324,10 +373,16 @@ class ProductsRepository extends BaseRepository
     private const COLUMNAS_LISTA = 'p.id AS id, n.sucursal AS sucursal, n.nombre AS nombreSucursal, p.description AS description,
             p.cost_price AS cost_price, p.sale_price AS sale_price, p.quantity AS quantity,
             p.id_proveedor AS id_proveedor, p.code AS code, p.size AS size, p.activo AS activo, p.codigo_interno AS codigoInterno,
-            p.fecha_actualizado AS fechaActualizado, p.barcode AS barcode';
+            p.fecha_actualizado AS fechaActualizado, p.barcode AS barcode, p.stock_minimo AS stockMinimo';
 
-    /** Stock a partir del cual un producto deja de contar como "stock bajo". */
+    /** Mínimo general si el negocio no eligió otro. */
     public const STOCK_BAJO = 3;
+
+    /**
+     * Stock mínimo efectivo de un producto (alias "p"): el suyo, o el general del negocio.
+     * Con el stock en este número o menos, el producto está "para reponer".
+     */
+    public const MINIMO = 'COALESCE(p.stock_minimo, (SELECT nc.stock_minimo_general FROM negocio_config nc WHERE nc.id_negocio = p.id_negocio), 3)';
 
     /**
      * Búsqueda paginada de productos activos del negocio.
@@ -363,7 +418,9 @@ class ProductsRepository extends BaseRepository
         if ($filtro === 'sin_stock') {
             $where[] = 'p.quantity <= 0';
         } elseif ($filtro === 'stock_bajo') {
-            $where[] = 'p.quantity > 0 AND p.quantity <= ' . self::STOCK_BAJO;
+            $where[] = 'p.quantity > 0 AND p.quantity <= ' . self::MINIMO;
+        } elseif ($filtro === 'reponer') {
+            $where[] = 'p.quantity <= ' . self::MINIMO;
         }
         $condicion = implode(' AND ', $where);
         $from = 'FROM product p INNER JOIN negocio n ON n.id_negocio = p.id_negocio AND n.sucursal = p.sucursal';
@@ -426,7 +483,8 @@ class ProductsRepository extends BaseRepository
         $pdo = $this->get_bbdd();
         $servidor = (string) $pdo->query('SELECT DATE_FORMAT(NOW(), "%Y-%m-%d %H:%i:%s")')->fetchColumn();
         $columnas = 'p.id, p.description, p.code, p.codigo_interno AS codigoInterno, p.barcode, p.sale_price AS salePrice,
-            p.cost_price AS costPrice, p.quantity, p.sucursal, p.id_proveedor AS idProveedor, p.size';
+            p.cost_price AS costPrice, p.quantity, p.sucursal, p.id_proveedor AS idProveedor, p.size,
+            p.stock_minimo AS stockMinimo';
 
         try {
             if ($desde !== null) {
@@ -548,6 +606,10 @@ class ProductsRepository extends BaseRepository
         if (isset($cambios['stock'])) {
             $sets[] = 'quantity = ?';
             $valores[] = (int) $cambios['stock'];
+        }
+        if (array_key_exists('stock_minimo', $cambios)) {
+            $sets[] = 'stock_minimo = ?';
+            $valores[] = $cambios['stock_minimo'] === null ? null : (int) $cambios['stock_minimo'];
         }
         if (!$sets) {
             return 0;

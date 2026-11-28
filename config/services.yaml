@@ -32,6 +32,11 @@ services:
             - '@App\Repository\UsuarioRepository'
 
     # Servicios
+    # Factura electrónica: el transporte HTTP hacia ARCA es público para poder simularlo en los tests.
+    App\Service\Arca\HttpArcaTransporte:
+        public: true
+    App\Service\Arca\ArcaTransporte: '@App\Service\Arca\HttpArcaTransporte'
+
     Symfony\Component\Cache\Adapter\FilesystemAdapter:
         class: Symfony\Component\Cache\Adapter\FilesystemAdapter
 

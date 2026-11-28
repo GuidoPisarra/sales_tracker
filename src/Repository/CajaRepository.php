@@ -78,15 +78,29 @@ class CajaRepository extends NegocioConfigRepository
      */
     public function ventasPorFormaPago(int $idNegocio, int $sucursal, string $desde, string $hasta): array
     {
+        // Las ventas con pago mixto se reparten según venta_pago (cuánto entró por cada medio).
         $stmt = $this->get_bbdd()->prepare(
-            'SELECT LOWER(COALESCE(type_payment, \'efectivo\')) AS forma_pago,
-                    SUM(quantity * price) AS total, COUNT(DISTINCT id_sale) AS ventas
-             FROM sales_product
-             WHERE id_negocio = :n AND sucursal = :s AND active = 0
-               AND sale_product_date >= :desde AND sale_product_date <= :hasta
-             GROUP BY LOWER(COALESCE(type_payment, \'efectivo\'))'
+            'SELECT forma_pago, SUM(total) AS total, COUNT(DISTINCT id_sale) AS ventas FROM (
+                SELECT LOWER(COALESCE(type_payment, \'efectivo\')) AS forma_pago, quantity * price AS total, id_sale
+                FROM sales_product
+                WHERE id_negocio = :n AND sucursal = :s AND active = 0
+                  AND sale_product_date >= :desde AND sale_product_date <= :hasta
+                  AND LOWER(COALESCE(type_payment, \'\')) <> \'mixto\'
+                UNION ALL
+                SELECT LOWER(vp.forma) AS forma_pago, vp.monto AS total, vp.id_sale
+                FROM venta_pago vp
+                WHERE vp.id_negocio = :n2 AND vp.id_sale IN (
+                    SELECT DISTINCT id_sale FROM sales_product
+                    WHERE id_negocio = :n3 AND sucursal = :s2 AND active = 0
+                      AND sale_product_date >= :desde2 AND sale_product_date <= :hasta2
+                      AND LOWER(type_payment) = \'mixto\')
+             ) x
+             GROUP BY forma_pago'
         );
-        $stmt->execute([':n' => $idNegocio, ':s' => $sucursal, ':desde' => $desde, ':hasta' => $hasta]);
+        $stmt->execute([
+            ':n' => $idNegocio, ':s' => $sucursal, ':desde' => $desde, ':hasta' => $hasta,
+            ':n2' => $idNegocio, ':n3' => $idNegocio, ':s2' => $sucursal, ':desde2' => $desde, ':hasta2' => $hasta,
+        ]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 

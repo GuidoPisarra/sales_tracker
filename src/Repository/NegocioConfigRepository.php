@@ -24,6 +24,12 @@ class NegocioConfigRepository extends BaseRepository
             'catalogo_sucursal' => 1,
             'catalogo_mostrar_stock' => 0,
             'catalogo_sin_stock' => 0,
+            'stock_minimo_general' => 3,
+            'ticket_titulo' => null,
+            'ticket_direccion' => null,
+            'ticket_telefono' => null,
+            'ticket_pie' => null,
+            'ticket_ancho' => 58,
         ];
     }
 

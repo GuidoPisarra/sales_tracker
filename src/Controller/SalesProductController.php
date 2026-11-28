@@ -8,6 +8,7 @@ use App\DTO\SalesProduct\RegisterSalesProductDTO;
 use App\Form\Type\SalesProduct\AddSalesProductType;
 use App\Form\Type\SalesProduct\DeleteSalesProductType;
 use App\Form\Type\SalesProduct\RegisterSalesProductType;
+use App\Service\FacturacionService;
 use App\Service\SalesProductService;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -51,7 +52,28 @@ class SalesProductController extends BaseController
         $sinConexion = $fechaOffline !== '';
         // Productos que el vendedor confirmó "vender igual" aunque el sistema dijera que no había stock.
         $forzarStock = [];
+        // Pago mixto: algún ítem (el front lo manda en el primero) trae "pagos": [{forma, monto}].
+        $pagos = null;
         foreach ($datos as $venta) {
+            if (is_array($venta) && !empty($venta['pagos']) && is_array($venta['pagos'])) {
+                $pagos = $venta['pagos'];
+                break;
+            }
+        }
+        if ($pagos !== null) {
+            $total = 0.0;
+            foreach ($datos as $venta) {
+                $total += (float) ($venta['salePrice'] ?? 0) * (int) ($venta['cantidad'] ?? 0);
+            }
+            $pagos = SalesProductService::normalizarPagos($pagos, $total);
+            if (is_string($pagos)) {
+                return $this->respuesta(400, [], [$pagos], 400);
+            }
+        }
+        foreach ($datos as $venta) {
+            if ($pagos !== null) {
+                $venta['typePayment'] = 'mixto';
+            }
             $forzarStock[] = !empty($venta['sinStock']);
             if ($check = $this->sucursalPermitida($venta['sucursal'] ?? null)) {
                 return $check;
@@ -81,13 +103,20 @@ class SalesProductController extends BaseController
 
         if (!$errores) {
             try {
-                $sales_product = $salesProduct_service->save_salesProduct($datosDto, $clave, $forzarStock, $sinConexion);
+                $sales_product = $salesProduct_service->save_salesProduct($datosDto, $clave, $forzarStock, $sinConexion, $pagos ?? []);
                 if ($sales_product === 'duplicada') {
                     return $this->respuesta(200, [true], [], 200, ['X-Venta-Duplicada' => '1']);
                 }
-                // datos[0] sigue siendo true (el front lo usa así); datos[1] lista lo que faltó.
-                $faltantes = $salesProduct_service->ultimosFaltantes();
-                return $this->respuesta(200, $faltantes ? [$sales_product, ['faltantes' => $faltantes]] : [$sales_product], []);
+                // datos[0] sigue siendo true (el front lo usa así); datos[1] trae el número de
+                // venta (para el ticket y la factura), lo que faltó de stock y la factura si se emitió.
+                $extra = ['idVenta' => $salesProduct_service->ultimaVenta()];
+                if ($faltantes = $salesProduct_service->ultimosFaltantes()) {
+                    $extra['faltantes'] = $faltantes;
+                }
+                if ($factura = $salesProduct_service->facturaAutomatica((int) $idNegocioUsuario, $extra['idVenta'])) {
+                    $extra['factura'] = $factura;
+                }
+                return $this->respuesta(200, [$sales_product, $extra], []);
             } catch (\Throwable $th) {
                 return $this->respuesta(400, [], [$th->getMessage()], 400);
             }
@@ -121,7 +150,7 @@ class SalesProductController extends BaseController
     }
 
     #[Route('/salesProduct/delete', name: 'app_delete_salesProduct', methods: ['POST'])]
-    public function salesProduct_delete(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service): JsonResponse
+    public function salesProduct_delete(Request $request, ValidatorInterface $validator, SalesProductService $salesProduct_service, FacturacionService $facturacion): JsonResponse
     {
         $this->request_to_json($request);
 
@@ -148,7 +177,14 @@ class SalesProductController extends BaseController
             }
             try {
                 $sales_product_delete = $salesProduct_service->delete_salesProduct($dto);
-                return $this->respuesta(200, [$sales_product_delete], []);
+                // Si la venta estaba facturada, se emite la nota de crédito (o queda pendiente).
+                $nota = null;
+                try {
+                    $nota = $facturacion->anularVenta($idNegocioReal, (int) $dto->getIdSaleProduct());
+                } catch (\Throwable $e) {
+                    error_log('nota de crédito: ' . $e->getMessage());
+                }
+                return $this->respuesta(200, $nota ? [$sales_product_delete, ['notaCredito' => $nota]] : [$sales_product_delete], []);
             } catch (\Throwable $th) {
                 return $this->respuesta(400, [], ['Ocurrió un error al obtener los productos.'], 400);
             }

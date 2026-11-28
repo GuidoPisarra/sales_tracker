@@ -113,6 +113,7 @@ class SuscripcionService
                 'mensajes_ia' => $int($p['max_mensajes_ia'] ?? null),
             ],
             'cuentas_corrientes' => !array_key_exists('cuentas_corrientes', $p) || (bool) $p['cuentas_corrientes'],
+            'facturacion' => !array_key_exists('facturacion', $p) || (bool) $p['facturacion'],
         ];
     }
 
@@ -173,6 +174,16 @@ class SuscripcionService
         }
         $plan = $this->planes->obtenerPorNegocio($idNegocio);
         return !$plan || !array_key_exists('cuentas_corrientes', $plan) || (bool) $plan['cuentas_corrientes'];
+    }
+
+    /** Factura electrónica ARCA: no viene en Starter. */
+    public function incluyeFacturacion(int $idNegocio): bool
+    {
+        if ($this->exento($idNegocio)) {
+            return true;
+        }
+        $plan = $this->planes->obtenerPorNegocio($idNegocio);
+        return !$plan || !array_key_exists('facturacion', $plan) || (bool) $plan['facturacion'];
     }
 
     public function registrarMensajeIa(int $idNegocio): void

@@ -7,7 +7,7 @@ use PDO;
 class PlanRepository extends BaseRepository
 {
     private const COLUMNAS_PLAN = 'ps.id, ps.nombre, ps.codigo, ps.precio_mensual, ps.max_sucursales, ps.max_usuarios,
-        ps.max_productos, ps.max_mensajes_ia, ps.cuentas_corrientes';
+        ps.max_productos, ps.max_mensajes_ia, ps.cuentas_corrientes, ps.facturacion';
 
     /**
      * Plan del negocio. La fuente de verdad es la suscripción; negocio.id_plan

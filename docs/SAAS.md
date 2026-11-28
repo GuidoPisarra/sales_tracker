@@ -258,3 +258,31 @@ php bin/phpunit
 
 Los tests usan MySQL (`kontia_test`, ver `.env.test`) y claves JWT de prueba en
 `config/jwt/` (el CI las genera solo).
+
+## Factura electrónica (ARCA)
+
+Desde la migración 0011. Viene en Pro, Premium y Fundador (`plan_suscripcion.facturacion`).
+Se habla con ARCA por SOAP "a mano" (HttpClient), así que **no hace falta ext-soap**; sí `openssl`.
+
+Qué hace el administrador del negocio en Kontia (pantalla **Facturación electrónica**):
+
+1. Carga CUIT, razón social, condición frente al IVA, punto de venta y domicilio.
+2. Toca **Generar pedido de certificado** y copia el texto (CSR).
+3. En ARCA con clave fiscal: *Administración de certificados digitales* → alias `kontia` → sube el pedido y descarga el `.crt`.
+   Para pruebas (homologación) es el servicio *WSASS - Autogestión certificados homologación*.
+4. En ARCA: *Administrador de relaciones de clave fiscal* → nueva relación → servicio *Facturación electrónica* (wsfe) → representante: el certificado `kontia`.
+5. En ARCA: *Administración de puntos de venta y domicilios* → punto de venta nuevo del tipo **Factura electrónica - Monotributo / RECE - Web services**.
+6. Pega el certificado en Kontia, toca **Probar conexión** y **Activar**.
+
+Cambiar entre pruebas y producción descarta el certificado (son distintos).
+
+En el VPS:
+
+- `ARCA_CLAVE` en el `.env` (o deja la de `APP_SECRET`). No cambiarla después.
+- Cron `app:facturas:reintentar` cada 10 minutos (ver `scripts/crontab.ejemplo`): reintenta las facturas que quedaron pendientes porque ARCA no respondió.
+
+Reglas: monotributo y exento emiten Factura C; responsable inscripto emite B a consumidor final y A
+a responsables inscriptos o monotributistas (con CUIT). Los precios incluyen IVA, con una sola
+alícuota por negocio. Anular una venta facturada emite la nota de crédito. Si ARCA no responde, la
+venta se guarda igual y el comprobante queda pendiente; antes de reintentar se consulta si ARCA ya
+lo había emitido, para no duplicar.

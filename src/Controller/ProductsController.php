@@ -307,6 +307,11 @@ class ProductsController extends BaseController
                 if ($resultado !== true) {
                     throw new \Exception("Ocurrió un error al editar el producto.");
                 }
+                // Stock mínimo (opcional): vacío o null = usar el mínimo general del negocio.
+                $crudo = json_decode($request->getContent(), true) ?: [];
+                if (array_key_exists('stockMinimo', $crudo)) {
+                    $product_service->fijarStockMinimo($idNegocioReal, (int) $dto->getId(), self::minimoValido($crudo['stockMinimo']));
+                }
                 $respuesta = [
                     'OK' => 'OK'
                 ];
@@ -319,7 +324,7 @@ class ProductsController extends BaseController
     }
 
     /**
-     * Búsqueda paginada: ?q=texto&proveedor=&filtro=sin_stock|stock_bajo&sucursal=&pagina=1&limite=50
+     * Búsqueda paginada: ?q=texto&proveedor=&filtro=sin_stock|stock_bajo|reponer&sucursal=&pagina=1&limite=50
      * Reemplaza bajar la lista completa en las pantallas de listado.
      */
     #[Route('/buscar', name: 'app_products_buscar', methods: ['GET'])]
@@ -330,7 +335,7 @@ class ProductsController extends BaseController
             return $this->respuesta(403, [], ['No tiene permisos sobre este negocio.'], 403);
         }
         $filtro = $request->query->get('filtro');
-        $filtro = in_array($filtro, ['sin_stock', 'stock_bajo'], true) ? $filtro : null;
+        $filtro = in_array($filtro, ['sin_stock', 'stock_bajo', 'reponer'], true) ? $filtro : null;
         $proveedor = $request->query->get('proveedor');
         $sucursal = $request->query->get('sucursal');
         if ($sucursal !== null && $sucursal !== '' && ($check = $this->sucursalPermitida((int) $sucursal))) {
@@ -484,6 +489,10 @@ class ProductsController extends BaseController
         if (isset($crudos['stock']) && is_numeric($crudos['stock']) && (int) $crudos['stock'] >= 0) {
             $cambios['stock'] = (int) $crudos['stock'];
         }
+        // Stock mínimo: un número, o null para volver al mínimo general.
+        if (array_key_exists('stockMinimo', $crudos)) {
+            $cambios['stock_minimo'] = self::minimoValido($crudos['stockMinimo']);
+        }
         if (!$ids || !$cambios) {
             return $this->respuesta(400, [], ['Elegí productos y al menos un cambio.'], 400);
         }
@@ -493,6 +502,30 @@ class ProductsController extends BaseController
         } catch (\Throwable $th) {
             return $this->respuesta(400, [], ['No se pudieron modificar los productos.'], 400);
         }
+    }
+
+    /**
+     * Productos para reponer: stock en el mínimo o por debajo, agrupables por proveedor.
+     * ?sucursal= opcional. Los empleados también la ven (son los que avisan qué falta).
+     */
+    #[Route('/reponer', name: 'app_products_reponer', methods: ['GET'])]
+    public function reponer(Request $request, ProductsService $products_service): JsonResponse
+    {
+        $sucursal = $request->query->get('sucursal');
+        $sucursal = is_numeric($sucursal) && (int) $sucursal > 0 ? (int) $sucursal : null;
+        if ($sucursal !== null && ($check = $this->sucursalPermitida($sucursal))) {
+            return $check;
+        }
+        return $this->respuesta(200, $products_service->paraReponer((int) $this->idNegocioUsuarioActual(), $sucursal), []);
+    }
+
+    /** Stock mínimo válido: entero de 0 a 100000, o null (vacío) para usar el general. */
+    public static function minimoValido($valor): ?int
+    {
+        if ($valor === null || $valor === '' || !is_numeric($valor)) {
+            return null;
+        }
+        return max(0, min(100000, (int) $valor));
     }
 
     /**

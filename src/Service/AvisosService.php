@@ -65,15 +65,20 @@ class AvisosService
             ];
         }
 
-        $sinStock = $this->rep_products->contarSinStock($idNegocio);
-        if ($sinStock > 0) {
+        // Productos en el stock mínimo o por debajo (incluye los que se quedaron sin stock).
+        $reponer = $this->rep_products->contarParaReponer($idNegocio);
+        if ($reponer > 0) {
+            $sinStock = $this->rep_products->contarSinStock($idNegocio);
+            $detalle = $sinStock > 0 ? ($sinStock === 1 ? ' 1 ya no tiene stock.' : " {$sinStock} ya no tienen stock.") : '';
             $avisos[] = [
-                'id' => $this->idAviso('sin_stock', $hoy, $sinStock),
-                'titulo' => 'Productos sin stock',
-                'mensaje' => $sinStock === 1
-                    ? 'Hay 1 producto sin stock.'
-                    : "Hay {$sinStock} productos sin stock.",
+                'id' => $this->idAviso('reponer', $hoy, $reponer),
+                'titulo' => 'Productos para reponer',
+                'mensaje' => ($reponer === 1
+                    ? 'Hay 1 producto en el stock mínimo o por debajo.'
+                    : "Hay {$reponer} productos en el stock mínimo o por debajo.") . $detalle,
                 'tipo' => 'advertencia',
+                'ruta' => '/reponer',
+                'texto_ruta' => 'Ver lista para reponer',
             ];
         }
 
