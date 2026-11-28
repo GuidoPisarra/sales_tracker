@@ -261,7 +261,7 @@ Los tests usan MySQL (`kontia_test`, ver `.env.test`) y claves JWT de prueba en
 
 ## Factura electrónica (ARCA)
 
-Desde la migración 0011. Viene en Pro, Premium y Fundador (`plan_suscripcion.facturacion`).
+Desde la migración 0014. Viene en Pro, Premium y Fundador (`plan_suscripcion.facturacion`).
 Se habla con ARCA por SOAP "a mano" (HttpClient), así que **no hace falta ext-soap**; sí `openssl`.
 
 Qué hace el administrador del negocio en Kontia (pantalla **Facturación electrónica**):

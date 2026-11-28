@@ -82,7 +82,7 @@ class ReportService
             try {
                 $facturas = $this->rep_facturas->ultimasDeVentas($id_negocio, $idsVenta);
             } catch (\PDOException $e) {
-                $facturas = []; // Base sin la migración 0011.
+                $facturas = []; // Base sin la migración 0014.
             }
         }
         foreach ($ventasAgrupadas as &$lineas) {
